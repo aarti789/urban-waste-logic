@@ -260,6 +260,9 @@ const AnalyticsCharts = ({ bins }: Props) => {
                   <Legend />
                 </BarChart>
               </ResponsiveContainer>
+              <p className="mt-2 text-sm font-semibold text-success flex items-center gap-1.5">
+                🥇 Best Performance: {monthlyData[bestWeekIndex]?.week}
+              </p>
             </CardContent>
           </Card>
 
