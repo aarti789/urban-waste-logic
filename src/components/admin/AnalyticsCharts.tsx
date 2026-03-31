@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { BinRecord } from '@/types';
 import { mockDailyStats, getZoneSummary, routeDataset } from '@/data/mockData';
 import WeeklyMonthlyAnalysis from './WeeklyMonthlyAnalysis';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, TrendingDown, CalendarDays, BarChart3, Lightbulb } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { TrendingUp, TrendingDown, CalendarDays, BarChart3, Lightbulb, Route, Download } from 'lucide-react';
 import {
   PieChart, Pie, Cell, BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
