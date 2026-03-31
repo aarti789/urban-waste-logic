@@ -143,20 +143,24 @@ const AnalyticsCharts = ({ bins }: Props) => {
               <Route className="w-3.5 h-3.5 mr-1.5" />
               {routeOptimized ? 'Route Optimized ✅' : 'Optimize Route'}
             </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => {
-                const toast = document.createElement('div');
-                toast.className = 'fixed top-4 right-4 bg-card border shadow-lg rounded-lg px-4 py-3 z-50 text-sm font-medium animate-fade-in';
-                toast.textContent = 'Report Downloaded ✅';
-                document.body.appendChild(toast);
-                setTimeout(() => toast.remove(), 2500);
-              }}
-            >
-              <Download className="w-3.5 h-3.5 mr-1.5" />
-              Download Report
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="secondary">
+                  <Download className="w-3.5 h-3.5 mr-1.5" />
+                  Download Report
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => exportPDF(bins, mockDailyStats, routeDataset)}>
+                  <FileText className="w-4 h-4 mr-2" />
+                  Export as PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportCSV(bins, mockDailyStats, routeDataset)}>
+                  <FileSpreadsheet className="w-4 h-4 mr-2" />
+                  Export as CSV
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
