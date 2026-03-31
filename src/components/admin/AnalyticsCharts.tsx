@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
 import { BinRecord } from '@/types';
 import { mockDailyStats, getZoneSummary, routeDataset } from '@/data/mockData';
+import { exportCSV, exportPDF } from '@/lib/exportReport';
 import WeeklyMonthlyAnalysis from './WeeklyMonthlyAnalysis';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, TrendingDown, CalendarDays, BarChart3, Lightbulb, Route, Download } from 'lucide-react';
+import { TrendingUp, TrendingDown, CalendarDays, BarChart3, Lightbulb, Route, Download, FileText, FileSpreadsheet } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
   PieChart, Pie, Cell, BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -141,20 +143,24 @@ const AnalyticsCharts = ({ bins }: Props) => {
               <Route className="w-3.5 h-3.5 mr-1.5" />
               {routeOptimized ? 'Route Optimized ✅' : 'Optimize Route'}
             </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => {
-                const toast = document.createElement('div');
-                toast.className = 'fixed top-4 right-4 bg-card border shadow-lg rounded-lg px-4 py-3 z-50 text-sm font-medium animate-fade-in';
-                toast.textContent = 'Report Downloaded ✅';
-                document.body.appendChild(toast);
-                setTimeout(() => toast.remove(), 2500);
-              }}
-            >
-              <Download className="w-3.5 h-3.5 mr-1.5" />
-              Download Report
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="secondary">
+                  <Download className="w-3.5 h-3.5 mr-1.5" />
+                  Download Report
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => exportPDF(bins, mockDailyStats, routeDataset)}>
+                  <FileText className="w-4 h-4 mr-2" />
+                  Export as PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportCSV(bins, mockDailyStats, routeDataset)}>
+                  <FileSpreadsheet className="w-4 h-4 mr-2" />
+                  Export as CSV
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
