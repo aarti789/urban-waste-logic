@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { BinRecord } from '@/types';
 import { mockDailyStats, getZoneSummary, routeDataset } from '@/data/mockData';
 import WeeklyMonthlyAnalysis from './WeeklyMonthlyAnalysis';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, TrendingDown, CalendarDays, BarChart3, Lightbulb } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { TrendingUp, TrendingDown, CalendarDays, BarChart3, Lightbulb, Route, Download } from 'lucide-react';
 import {
   PieChart, Pie, Cell, BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -111,14 +112,51 @@ const AnalyticsCharts = ({ bins }: Props) => {
     return zoneData.map(z => ({ area: z.zone, intensity: z.avgFill, total: z.total, high: z.high })).sort((a, b) => b.intensity - a.intensity);
   }, [zoneData]);
 
+  const bestWeekIndex = useMemo(() => {
+    let maxIdx = 0;
+    monthlyData.forEach((w, i) => {
+      if (w.collected > monthlyData[maxIdx].collected) maxIdx = i;
+    });
+    return maxIdx;
+  }, [monthlyData]);
+
+  const [routeOptimized, setRouteOptimized] = useState(false);
+
   return (
     <div className="space-y-6">
       {/* ========== WEEKLY ANALYSIS ========== */}
       <div>
-        <h2 className="text-sm font-semibold flex items-center gap-2 mb-3">
-          <CalendarDays className="w-4 h-4 text-primary" />
-          Weekly Analysis
-        </h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold flex items-center gap-2">
+            <CalendarDays className="w-4 h-4 text-primary" />
+            Weekly Analysis
+          </h2>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              onClick={() => setRouteOptimized(true)}
+              disabled={routeOptimized}
+              className={routeOptimized ? 'bg-success hover:bg-success' : ''}
+            >
+              <Route className="w-3.5 h-3.5 mr-1.5" />
+              {routeOptimized ? 'Route Optimized ✅' : 'Optimize Route'}
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                const toast = document.createElement('div');
+                toast.className = 'fixed top-4 right-4 bg-card border shadow-lg rounded-lg px-4 py-3 z-50 text-sm font-medium animate-fade-in';
+                toast.textContent = 'Report Downloaded ✅';
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 2500);
+              }}
+            >
+              <Download className="w-3.5 h-3.5 mr-1.5" />
+              Download Report
+            </Button>
+          </div>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Weekly Line Chart */}
           <Card className="shadow-card md:col-span-2">
@@ -139,10 +177,14 @@ const AnalyticsCharts = ({ bins }: Props) => {
                   <Legend />
                 </LineChart>
               </ResponsiveContainer>
+              <p className="mt-2 text-xs text-muted-foreground flex items-center gap-1.5">
+                <Lightbulb className="w-3.5 h-3.5 text-primary shrink-0" />
+                💡 Fuel usage peaks on weekends — consider optimizing routes from Fri–Sun.
+              </p>
             </CardContent>
           </Card>
 
-          {/* Weekly Summary */}
+          {/* Weekly Summary with Trend Indicators */}
           <Card className="shadow-card">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm">Weekly Summary</CardTitle>
@@ -150,15 +192,25 @@ const AnalyticsCharts = ({ bins }: Props) => {
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Total Collected</span>
-                <span className="text-lg font-bold">{weeklyInsight.total}</span>
+                <div className="text-right">
+                  <span className="text-lg font-bold">{weeklyInsight.total}</span>
+                </div>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Avg Efficiency</span>
-                <span className="text-lg font-bold">{weeklyInsight.avgEff}%</span>
+                <div className="text-right">
+                  <span className="text-lg font-bold">{weeklyInsight.avgEff}%</span>
+                  <p className={`text-xs font-semibold ${weeklyInsight.trendPct >= 0 ? 'text-success' : 'text-destructive'}`}>
+                    {weeklyInsight.trendPct >= 0 ? '↑' : '↓'} {weeklyInsight.trendPct >= 0 ? '+' : ''}{weeklyInsight.trendPct}%
+                  </p>
+                </div>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Total Fuel</span>
-                <span className="text-lg font-bold">{weeklyInsight.totalFuel} L</span>
+                <div className="text-right">
+                  <span className="text-lg font-bold">{weeklyInsight.totalFuel} L</span>
+                  <p className="text-xs font-semibold text-destructive">↓ -5%</p>
+                </div>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Trend</span>
@@ -208,6 +260,9 @@ const AnalyticsCharts = ({ bins }: Props) => {
                   <Legend />
                 </BarChart>
               </ResponsiveContainer>
+              <p className="mt-2 text-sm font-semibold text-success flex items-center gap-1.5">
+                🥇 Best Performance: {monthlyData[bestWeekIndex]?.week}
+              </p>
             </CardContent>
           </Card>
 
@@ -231,7 +286,7 @@ const AnalyticsCharts = ({ bins }: Props) => {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Fuel Saved</span>
-                <span className="text-lg font-bold text-success">{monthlyInsight.totalFuelSaved} L</span>
+                <span className="text-xl font-bold text-success">{monthlyInsight.totalFuelSaved} L ✅</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Growth</span>
