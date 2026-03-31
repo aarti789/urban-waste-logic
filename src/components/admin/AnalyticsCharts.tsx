@@ -5,7 +5,8 @@ import { exportCSV, exportPDF } from '@/lib/exportReport';
 import WeeklyMonthlyAnalysis from './WeeklyMonthlyAnalysis';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, TrendingDown, CalendarDays, BarChart3, Lightbulb, Route, Download } from 'lucide-react';
+import { TrendingUp, TrendingDown, CalendarDays, BarChart3, Lightbulb, Route, Download, FileText, FileSpreadsheet } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
   PieChart, Pie, Cell, BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
