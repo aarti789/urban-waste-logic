@@ -313,15 +313,30 @@ const AnalyticsCharts = ({ bins }: Props) => {
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Total Collected</span>
-                <span className="text-lg font-bold">{monthlyInsight.totalCollected}</span>
+                <div className="text-right">
+                  <span className="text-lg font-bold">{monthlyInsight.totalCollected}</span>
+                  <p className={`text-xs font-semibold ${monthlyInsight.growthPct >= 0 ? 'text-success' : 'text-destructive'}`}>
+                    {monthlyInsight.growthPct >= 0 ? '↑' : '↓'} {monthlyInsight.growthPct >= 0 ? '+' : ''}{monthlyInsight.growthPct}% avg WoW
+                  </p>
+                </div>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Avg Efficiency</span>
-                <span className="text-lg font-bold">{monthlyInsight.avgEff}%</span>
+                <div className="text-right">
+                  <span className="text-lg font-bold">{monthlyInsight.avgEff}%</span>
+                  <p className={`text-xs font-semibold ${monthlyInsight.effTrendPct >= 0 ? 'text-success' : 'text-destructive'}`}>
+                    {monthlyInsight.effTrendPct >= 0 ? '↑' : '↓'} {monthlyInsight.effTrendPct >= 0 ? '+' : ''}{monthlyInsight.effTrendPct}%
+                  </p>
+                </div>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Total Fuel Used</span>
-                <span className="text-lg font-bold">{monthlyInsight.totalFuel} L</span>
+                <div className="text-right">
+                  <span className="text-lg font-bold">{monthlyInsight.totalFuel} L</span>
+                  <p className={`text-xs font-semibold ${monthlyInsight.fuelTrendPct <= 0 ? 'text-success' : 'text-destructive'}`}>
+                    {monthlyInsight.fuelTrendPct <= 0 ? '↓' : '↑'} {monthlyInsight.fuelTrendPct >= 0 ? '+' : ''}{monthlyInsight.fuelTrendPct}%
+                  </p>
+                </div>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Fuel Saved</span>
