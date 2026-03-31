@@ -87,10 +87,26 @@ const AnalyticsCharts = ({ bins }: Props) => {
     const avgEff = Math.round(monthlyData.reduce((s, d) => s + d.efficiency, 0) / monthlyData.length);
     const totalFuel = parseFloat(monthlyData.reduce((s, d) => s + d.fuel, 0).toFixed(1));
     const totalFuelSaved = parseFloat(routeDataset.reduce((s, r) => s + r.fuelSaved, 0).toFixed(1));
-    const first = monthlyData[0]?.collected || 1;
-    const last = monthlyData[monthlyData.length - 1]?.collected || 0;
-    const growthPct = Math.round(((last - first) / first) * 100);
-    return { totalCollected, avgEff, totalFuel, totalFuelSaved, growthPct };
+
+    // Week-over-week average growth
+    const wowGrowths: number[] = [];
+    for (let i = 1; i < monthlyData.length; i++) {
+      const prev = monthlyData[i - 1].collected || 1;
+      wowGrowths.push(((monthlyData[i].collected - prev) / prev) * 100);
+    }
+    const growthPct = wowGrowths.length > 0 ? Math.round(wowGrowths.reduce((s, g) => s + g, 0) / wowGrowths.length) : 0;
+
+    // Efficiency trend: first 2 weeks avg vs last 2 weeks avg
+    const effFirst = monthlyData.slice(0, 2).reduce((s, d) => s + d.efficiency, 0) / 2;
+    const effLast = monthlyData.slice(-2).reduce((s, d) => s + d.efficiency, 0) / 2;
+    const effTrendPct = effFirst > 0 ? Math.round(((effLast - effFirst) / effFirst) * 100) : 0;
+
+    // Fuel trend: first 2 weeks avg vs last 2 weeks avg
+    const fuelFirst = monthlyData.slice(0, 2).reduce((s, d) => s + d.fuel, 0) / 2;
+    const fuelLast = monthlyData.slice(-2).reduce((s, d) => s + d.fuel, 0) / 2;
+    const fuelTrendPct = fuelFirst > 0 ? Math.round(((fuelLast - fuelFirst) / fuelFirst) * 100) : 0;
+
+    return { totalCollected, avgEff, totalFuel, totalFuelSaved, growthPct, effTrendPct, fuelTrendPct };
   }, [monthlyData]);
 
   // ===== EXISTING CHARTS DATA =====
