@@ -44,10 +44,25 @@ const AnalyticsCharts = ({ bins }: Props) => {
     const total = weeklyData.reduce((s, d) => s + d.collected, 0);
     const avgEff = Math.round(weeklyData.reduce((s, d) => s + d.efficiency, 0) / weeklyData.length);
     const totalFuel = parseFloat(weeklyData.reduce((s, d) => s + d.fuel, 0).toFixed(1));
-    const first = weeklyData[0]?.collected || 1;
-    const last = weeklyData[weeklyData.length - 1]?.collected || 0;
-    const trendPct = Math.round(((last - first) / first) * 100);
-    return { total, avgEff, totalFuel, trendPct };
+
+    // Moving average: avg of first 3 days vs last 3 days
+    const firstHalf = weeklyData.slice(0, 3);
+    const lastHalf = weeklyData.slice(-3);
+    const avgFirst = firstHalf.reduce((s, d) => s + d.collected, 0) / firstHalf.length;
+    const avgLast = lastHalf.reduce((s, d) => s + d.collected, 0) / lastHalf.length;
+    const trendPct = avgFirst > 0 ? Math.round(((avgLast - avgFirst) / avgFirst) * 100) : 0;
+
+    // Efficiency trend (first 3 vs last 3)
+    const effFirst = firstHalf.reduce((s, d) => s + d.efficiency, 0) / firstHalf.length;
+    const effLast = lastHalf.reduce((s, d) => s + d.efficiency, 0) / lastHalf.length;
+    const effTrendPct = effFirst > 0 ? Math.round(((effLast - effFirst) / effFirst) * 100) : 0;
+
+    // Fuel trend (first 3 vs last 3, negative = good = less fuel)
+    const fuelFirst = firstHalf.reduce((s, d) => s + d.fuel, 0) / firstHalf.length;
+    const fuelLast = lastHalf.reduce((s, d) => s + d.fuel, 0) / lastHalf.length;
+    const fuelTrendPct = fuelFirst > 0 ? Math.round(((fuelLast - fuelFirst) / fuelFirst) * 100) : 0;
+
+    return { total, avgEff, totalFuel, trendPct, effTrendPct, fuelTrendPct };
   }, [weeklyData]);
 
   // ===== MONTHLY ANALYSIS =====
