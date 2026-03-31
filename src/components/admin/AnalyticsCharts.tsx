@@ -237,8 +237,8 @@ const AnalyticsCharts = ({ bins }: Props) => {
                 <span className="text-sm text-muted-foreground">Avg Efficiency</span>
                 <div className="text-right">
                   <span className="text-lg font-bold">{weeklyInsight.avgEff}%</span>
-                  <p className={`text-xs font-semibold ${weeklyInsight.trendPct >= 0 ? 'text-success' : 'text-destructive'}`}>
-                    {weeklyInsight.trendPct >= 0 ? '↑' : '↓'} {weeklyInsight.trendPct >= 0 ? '+' : ''}{weeklyInsight.trendPct}%
+                  <p className={`text-xs font-semibold ${weeklyInsight.effTrendPct >= 0 ? 'text-success' : 'text-destructive'}`}>
+                    {weeklyInsight.effTrendPct >= 0 ? '↑' : '↓'} {weeklyInsight.effTrendPct >= 0 ? '+' : ''}{weeklyInsight.effTrendPct}%
                   </p>
                 </div>
               </div>
@@ -246,7 +246,9 @@ const AnalyticsCharts = ({ bins }: Props) => {
                 <span className="text-sm text-muted-foreground">Total Fuel</span>
                 <div className="text-right">
                   <span className="text-lg font-bold">{weeklyInsight.totalFuel} L</span>
-                  <p className="text-xs font-semibold text-destructive">↓ -5%</p>
+                  <p className={`text-xs font-semibold ${weeklyInsight.fuelTrendPct <= 0 ? 'text-success' : 'text-destructive'}`}>
+                    {weeklyInsight.fuelTrendPct <= 0 ? '↓' : '↑'} {weeklyInsight.fuelTrendPct >= 0 ? '+' : ''}{weeklyInsight.fuelTrendPct}%
+                  </p>
                 </div>
               </div>
               <div className="flex items-center justify-between">
