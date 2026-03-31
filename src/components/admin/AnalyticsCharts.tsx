@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { BinRecord } from '@/types';
 import { mockDailyStats, getZoneSummary, routeDataset } from '@/data/mockData';
+import { exportCSV, exportPDF } from '@/lib/exportReport';
 import WeeklyMonthlyAnalysis from './WeeklyMonthlyAnalysis';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
