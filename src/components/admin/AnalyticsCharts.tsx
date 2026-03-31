@@ -283,7 +283,7 @@ const AnalyticsCharts = ({ bins }: Props) => {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Fuel Saved</span>
-                <span className="text-lg font-bold text-success">{monthlyInsight.totalFuelSaved} L</span>
+                <span className="text-xl font-bold text-success">{monthlyInsight.totalFuelSaved} L ✅</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Growth</span>
