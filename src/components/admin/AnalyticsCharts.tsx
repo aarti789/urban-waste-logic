@@ -44,10 +44,25 @@ const AnalyticsCharts = ({ bins }: Props) => {
     const total = weeklyData.reduce((s, d) => s + d.collected, 0);
     const avgEff = Math.round(weeklyData.reduce((s, d) => s + d.efficiency, 0) / weeklyData.length);
     const totalFuel = parseFloat(weeklyData.reduce((s, d) => s + d.fuel, 0).toFixed(1));
-    const first = weeklyData[0]?.collected || 1;
-    const last = weeklyData[weeklyData.length - 1]?.collected || 0;
-    const trendPct = Math.round(((last - first) / first) * 100);
-    return { total, avgEff, totalFuel, trendPct };
+
+    // Moving average: avg of first 3 days vs last 3 days
+    const firstHalf = weeklyData.slice(0, 3);
+    const lastHalf = weeklyData.slice(-3);
+    const avgFirst = firstHalf.reduce((s, d) => s + d.collected, 0) / firstHalf.length;
+    const avgLast = lastHalf.reduce((s, d) => s + d.collected, 0) / lastHalf.length;
+    const trendPct = avgFirst > 0 ? Math.round(((avgLast - avgFirst) / avgFirst) * 100) : 0;
+
+    // Efficiency trend (first 3 vs last 3)
+    const effFirst = firstHalf.reduce((s, d) => s + d.efficiency, 0) / firstHalf.length;
+    const effLast = lastHalf.reduce((s, d) => s + d.efficiency, 0) / lastHalf.length;
+    const effTrendPct = effFirst > 0 ? Math.round(((effLast - effFirst) / effFirst) * 100) : 0;
+
+    // Fuel trend (first 3 vs last 3, negative = good = less fuel)
+    const fuelFirst = firstHalf.reduce((s, d) => s + d.fuel, 0) / firstHalf.length;
+    const fuelLast = lastHalf.reduce((s, d) => s + d.fuel, 0) / lastHalf.length;
+    const fuelTrendPct = fuelFirst > 0 ? Math.round(((fuelLast - fuelFirst) / fuelFirst) * 100) : 0;
+
+    return { total, avgEff, totalFuel, trendPct, effTrendPct, fuelTrendPct };
   }, [weeklyData]);
 
   // ===== MONTHLY ANALYSIS =====
@@ -72,10 +87,26 @@ const AnalyticsCharts = ({ bins }: Props) => {
     const avgEff = Math.round(monthlyData.reduce((s, d) => s + d.efficiency, 0) / monthlyData.length);
     const totalFuel = parseFloat(monthlyData.reduce((s, d) => s + d.fuel, 0).toFixed(1));
     const totalFuelSaved = parseFloat(routeDataset.reduce((s, r) => s + r.fuelSaved, 0).toFixed(1));
-    const first = monthlyData[0]?.collected || 1;
-    const last = monthlyData[monthlyData.length - 1]?.collected || 0;
-    const growthPct = Math.round(((last - first) / first) * 100);
-    return { totalCollected, avgEff, totalFuel, totalFuelSaved, growthPct };
+
+    // Week-over-week average growth
+    const wowGrowths: number[] = [];
+    for (let i = 1; i < monthlyData.length; i++) {
+      const prev = monthlyData[i - 1].collected || 1;
+      wowGrowths.push(((monthlyData[i].collected - prev) / prev) * 100);
+    }
+    const growthPct = wowGrowths.length > 0 ? Math.round(wowGrowths.reduce((s, g) => s + g, 0) / wowGrowths.length) : 0;
+
+    // Efficiency trend: first 2 weeks avg vs last 2 weeks avg
+    const effFirst = monthlyData.slice(0, 2).reduce((s, d) => s + d.efficiency, 0) / 2;
+    const effLast = monthlyData.slice(-2).reduce((s, d) => s + d.efficiency, 0) / 2;
+    const effTrendPct = effFirst > 0 ? Math.round(((effLast - effFirst) / effFirst) * 100) : 0;
+
+    // Fuel trend: first 2 weeks avg vs last 2 weeks avg
+    const fuelFirst = monthlyData.slice(0, 2).reduce((s, d) => s + d.fuel, 0) / 2;
+    const fuelLast = monthlyData.slice(-2).reduce((s, d) => s + d.fuel, 0) / 2;
+    const fuelTrendPct = fuelFirst > 0 ? Math.round(((fuelLast - fuelFirst) / fuelFirst) * 100) : 0;
+
+    return { totalCollected, avgEff, totalFuel, totalFuelSaved, growthPct, effTrendPct, fuelTrendPct };
   }, [monthlyData]);
 
   // ===== EXISTING CHARTS DATA =====
@@ -206,8 +237,8 @@ const AnalyticsCharts = ({ bins }: Props) => {
                 <span className="text-sm text-muted-foreground">Avg Efficiency</span>
                 <div className="text-right">
                   <span className="text-lg font-bold">{weeklyInsight.avgEff}%</span>
-                  <p className={`text-xs font-semibold ${weeklyInsight.trendPct >= 0 ? 'text-success' : 'text-destructive'}`}>
-                    {weeklyInsight.trendPct >= 0 ? '↑' : '↓'} {weeklyInsight.trendPct >= 0 ? '+' : ''}{weeklyInsight.trendPct}%
+                  <p className={`text-xs font-semibold ${weeklyInsight.effTrendPct >= 0 ? 'text-success' : 'text-destructive'}`}>
+                    {weeklyInsight.effTrendPct >= 0 ? '↑' : '↓'} {weeklyInsight.effTrendPct >= 0 ? '+' : ''}{weeklyInsight.effTrendPct}%
                   </p>
                 </div>
               </div>
@@ -215,7 +246,9 @@ const AnalyticsCharts = ({ bins }: Props) => {
                 <span className="text-sm text-muted-foreground">Total Fuel</span>
                 <div className="text-right">
                   <span className="text-lg font-bold">{weeklyInsight.totalFuel} L</span>
-                  <p className="text-xs font-semibold text-destructive">↓ -5%</p>
+                  <p className={`text-xs font-semibold ${weeklyInsight.fuelTrendPct <= 0 ? 'text-success' : 'text-destructive'}`}>
+                    {weeklyInsight.fuelTrendPct <= 0 ? '↓' : '↑'} {weeklyInsight.fuelTrendPct >= 0 ? '+' : ''}{weeklyInsight.fuelTrendPct}%
+                  </p>
                 </div>
               </div>
               <div className="flex items-center justify-between">
@@ -280,15 +313,30 @@ const AnalyticsCharts = ({ bins }: Props) => {
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Total Collected</span>
-                <span className="text-lg font-bold">{monthlyInsight.totalCollected}</span>
+                <div className="text-right">
+                  <span className="text-lg font-bold">{monthlyInsight.totalCollected}</span>
+                  <p className={`text-xs font-semibold ${monthlyInsight.growthPct >= 0 ? 'text-success' : 'text-destructive'}`}>
+                    {monthlyInsight.growthPct >= 0 ? '↑' : '↓'} {monthlyInsight.growthPct >= 0 ? '+' : ''}{monthlyInsight.growthPct}% avg WoW
+                  </p>
+                </div>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Avg Efficiency</span>
-                <span className="text-lg font-bold">{monthlyInsight.avgEff}%</span>
+                <div className="text-right">
+                  <span className="text-lg font-bold">{monthlyInsight.avgEff}%</span>
+                  <p className={`text-xs font-semibold ${monthlyInsight.effTrendPct >= 0 ? 'text-success' : 'text-destructive'}`}>
+                    {monthlyInsight.effTrendPct >= 0 ? '↑' : '↓'} {monthlyInsight.effTrendPct >= 0 ? '+' : ''}{monthlyInsight.effTrendPct}%
+                  </p>
+                </div>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Total Fuel Used</span>
-                <span className="text-lg font-bold">{monthlyInsight.totalFuel} L</span>
+                <div className="text-right">
+                  <span className="text-lg font-bold">{monthlyInsight.totalFuel} L</span>
+                  <p className={`text-xs font-semibold ${monthlyInsight.fuelTrendPct <= 0 ? 'text-success' : 'text-destructive'}`}>
+                    {monthlyInsight.fuelTrendPct <= 0 ? '↓' : '↑'} {monthlyInsight.fuelTrendPct >= 0 ? '+' : ''}{monthlyInsight.fuelTrendPct}%
+                  </p>
+                </div>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Fuel Saved</span>
