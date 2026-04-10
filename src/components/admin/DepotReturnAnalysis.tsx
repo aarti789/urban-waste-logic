@@ -87,16 +87,21 @@ function multiPathToOne(graph: Edge[][], dest: number, n: number): number[] {
   return dist;
 }
 
-// Distance-based priority classification (mirrors Java getPriority logic)
-function getDistancePriority(distance: number): { label: string; level: string } {
-  if (distance <= 3) return { label: 'P1', level: 'high' };
-  if (distance <= 7) return { label: 'P2', level: 'medium' };
-  return { label: 'P3', level: 'low' };
+// Dynamic rank-based priority: sort by distance, assign P1 (closest) → PN (farthest)
+// Mirrors Java Collections.sort + sequential priority assignment
+function assignDynamicPriorities(items: { idx: number; dist: number }[]): Map<number, { label: string; rank: number }> {
+  const sorted = [...items].sort((a, b) => a.dist - b.dist);
+  const map = new Map<number, { label: string; rank: number }>();
+  sorted.forEach((item, i) => {
+    map.set(item.idx, { label: `P${i + 1}`, rank: i + 1 });
+  });
+  return map;
 }
 
-function priorityStyle(level: string) {
-  if (level === 'high') return 'bg-destructive/10 text-destructive border-destructive/20';
-  if (level === 'medium') return 'bg-warning/10 text-warning border-warning/20';
+function priorityStyle(rank: number, total: number) {
+  const pct = rank / total;
+  if (pct <= 0.33) return 'bg-destructive/10 text-destructive border-destructive/20';
+  if (pct <= 0.66) return 'bg-warning/10 text-warning border-warning/20';
   return 'bg-success/10 text-success border-success/20';
 }
 
@@ -107,7 +112,7 @@ interface DepotResult {
   fillLevel: number;
   distToDepot: number;
   distFromDepot: number;
-  priority: { label: string; level: string };
+  priority: { label: string; rank: number };
 }
 
 const DepotReturnAnalysis = () => {
@@ -129,6 +134,11 @@ const DepotReturnAnalysis = () => {
     // Reverse Dijkstra to depot
     const distToDepot = multiPathToOne(graph, depotIdx, n);
 
+    // Dynamic rank-based priority assignment (Java: sort by dist, assign P1..PN)
+    const priorityMap = assignDynamicPriorities(
+      bins.map((_, i) => ({ idx: i, dist: distFromDepot[i] }))
+    );
+
     const depotResults: DepotResult[] = bins.map((bin, i) => {
       const dFrom = parseFloat(distFromDepot[i].toFixed(2));
       const dTo = parseFloat(distToDepot[i].toFixed(2));
@@ -139,9 +149,9 @@ const DepotReturnAnalysis = () => {
         fillLevel: bin.fillLevel,
         distToDepot: dTo,
         distFromDepot: dFrom,
-        priority: getDistancePriority(dFrom),
+        priority: priorityMap.get(i) || { label: 'P?', rank: 999 },
       };
-    }).sort((a, b) => a.distFromDepot - b.distFromDepot);
+    }).sort((a, b) => a.priority.rank - b.priority.rank);
 
     setResults(depotResults);
     setComputed(true);
@@ -150,9 +160,10 @@ const DepotReturnAnalysis = () => {
       depotResults.map(r => `${r.binId}(${r.distFromDepot}km→${r.priority.label})`).join(', '));
   }, []);
 
-  const p1Count = results.filter(r => r.priority.label === 'P1').length;
-  const p2Count = results.filter(r => r.priority.label === 'P2').length;
-  const p3Count = results.filter(r => r.priority.label === 'P3').length;
+  const third = Math.ceil(results.length / 3);
+  const highCount = results.filter((_, i) => i < third).length;
+  const medCount = results.filter((_, i) => i >= third && i < third * 2).length;
+  const lowCount = results.length - highCount - medCount;
 
   return (
     <Card className="shadow-card border-accent/20 bg-accent/5">
@@ -164,7 +175,7 @@ const DepotReturnAnalysis = () => {
               Return-to-Depot Analysis
             </h3>
             <p className="text-xs text-muted-foreground">
-              Dijkstra forward + reverse: computes distances & classifies priority (P1 ≤3km, P2 ≤7km, P3 &gt;7km).
+              Dijkstra forward + reverse: ranks bins by distance, assigns dynamic priority P1→PN (closest first).
             </p>
           </div>
           <Button size="sm" variant="outline" onClick={handleCompute} disabled={computed} className="gap-1.5 shrink-0">
@@ -178,23 +189,23 @@ const DepotReturnAnalysis = () => {
             <div className="p-3 rounded-lg bg-background border">
               <p className="text-xs font-medium mb-1">
                 Depot: <span className="text-primary font-bold">{depotName}</span>
-                <span className="text-muted-foreground ml-2">({results.length} bins analyzed)</span>
+                <span className="text-muted-foreground ml-2">({results.length} bins ranked by Dijkstra distance)</span>
               </p>
             </div>
 
-            {/* Distance-Priority Classification Summary */}
+            {/* Dynamic Priority Distribution */}
             <div className="grid grid-cols-3 gap-2">
               <div className="p-2 rounded-lg bg-background border text-center">
-                <p className="text-sm font-bold text-destructive">{p1Count}</p>
-                <p className="text-[10px] text-muted-foreground">P1 — High (≤3km)</p>
+                <p className="text-sm font-bold text-destructive">{highCount}</p>
+                <p className="text-[10px] text-muted-foreground">High Priority (top ⅓)</p>
               </div>
               <div className="p-2 rounded-lg bg-background border text-center">
-                <p className="text-sm font-bold text-warning">{p2Count}</p>
-                <p className="text-[10px] text-muted-foreground">P2 — Medium (≤7km)</p>
+                <p className="text-sm font-bold text-warning">{medCount}</p>
+                <p className="text-[10px] text-muted-foreground">Medium Priority (mid ⅓)</p>
               </div>
               <div className="p-2 rounded-lg bg-background border text-center">
-                <p className="text-sm font-bold text-success">{p3Count}</p>
-                <p className="text-[10px] text-muted-foreground">P3 — Low (&gt;7km)</p>
+                <p className="text-sm font-bold text-success">{lowCount}</p>
+                <p className="text-[10px] text-muted-foreground">Low Priority (bottom ⅓)</p>
               </div>
             </div>
 
@@ -206,7 +217,7 @@ const DepotReturnAnalysis = () => {
                   <div key={r.binId} className="flex items-center gap-2 text-xs">
                     <MapPin className="w-3 h-3 text-muted-foreground shrink-0" />
                     <span className="font-medium min-w-[60px]">{r.binId}</span>
-                    <span className={`px-1.5 py-0.5 rounded border text-[10px] font-bold ${priorityStyle(r.priority.level)}`}>
+                    <span className={`px-1.5 py-0.5 rounded border text-[10px] font-bold ${priorityStyle(r.priority.rank, results.length)}`}>
                       {r.priority.label}
                     </span>
                     <span className="text-muted-foreground truncate flex-1">{r.binName}</span>
@@ -220,12 +231,12 @@ const DepotReturnAnalysis = () => {
               </div>
             </div>
 
-            {/* Warning for far bins */}
-            {p3Count > 0 && (
+            {/* Warning for low-priority (far) bins */}
+            {lowCount > 0 && (
               <div className="p-2 rounded-lg bg-warning/10 border border-warning/20 flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-warning shrink-0" />
                 <p className="text-xs text-warning">
-                  {p3Count} bin{p3Count > 1 ? 's' : ''} classified as P3 (far from depot) — consider relay points or reassignment.
+                  {lowCount} bin{lowCount > 1 ? 's' : ''} ranked as low priority (farthest from depot) — consider relay points or reassignment.
                 </p>
               </div>
             )}
