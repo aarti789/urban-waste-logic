@@ -142,7 +142,7 @@ const RouteAnalysis = () => {
                 AI Route Optimization Engine
               </h3>
               <p className="text-xs text-muted-foreground">
-                Greedy nearest-neighbour algorithm: prioritizes high-fill bins, then minimizes travel distance.
+                Dijkstra shortest-path algorithm: prioritizes high-fill bins, then finds optimal travel path between nodes.
               </p>
             </div>
             <Button size="sm" onClick={handleOptimize} disabled={optimized} className="gap-1.5 shrink-0">
