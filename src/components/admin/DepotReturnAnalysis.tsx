@@ -112,7 +112,7 @@ interface DepotResult {
   fillLevel: number;
   distToDepot: number;
   distFromDepot: number;
-  priority: { label: string; level: string };
+  priority: { label: string; rank: number };
 }
 
 const DepotReturnAnalysis = () => {
@@ -134,6 +134,11 @@ const DepotReturnAnalysis = () => {
     // Reverse Dijkstra to depot
     const distToDepot = multiPathToOne(graph, depotIdx, n);
 
+    // Dynamic rank-based priority assignment (Java: sort by dist, assign P1..PN)
+    const priorityMap = assignDynamicPriorities(
+      bins.map((_, i) => ({ idx: i, dist: distFromDepot[i] }))
+    );
+
     const depotResults: DepotResult[] = bins.map((bin, i) => {
       const dFrom = parseFloat(distFromDepot[i].toFixed(2));
       const dTo = parseFloat(distToDepot[i].toFixed(2));
@@ -144,9 +149,9 @@ const DepotReturnAnalysis = () => {
         fillLevel: bin.fillLevel,
         distToDepot: dTo,
         distFromDepot: dFrom,
-        priority: getDistancePriority(dFrom),
+        priority: priorityMap.get(i) || { label: 'P?', rank: 999 },
       };
-    }).sort((a, b) => a.distFromDepot - b.distFromDepot);
+    }).sort((a, b) => a.priority.rank - b.priority.rank);
 
     setResults(depotResults);
     setComputed(true);
@@ -211,7 +216,7 @@ const DepotReturnAnalysis = () => {
                   <div key={r.binId} className="flex items-center gap-2 text-xs">
                     <MapPin className="w-3 h-3 text-muted-foreground shrink-0" />
                     <span className="font-medium min-w-[60px]">{r.binId}</span>
-                    <span className={`px-1.5 py-0.5 rounded border text-[10px] font-bold ${priorityStyle(r.priority.level)}`}>
+                    <span className={`px-1.5 py-0.5 rounded border text-[10px] font-bold ${priorityStyle(r.priority.rank, results.length)}`}>
                       {r.priority.label}
                     </span>
                     <span className="text-muted-foreground truncate flex-1">{r.binName}</span>
