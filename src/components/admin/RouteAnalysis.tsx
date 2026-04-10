@@ -36,11 +36,12 @@ function buildGraph(bins: BinRecord[]): Edge[][] {
   return graph;
 }
 
-function dijkstra(graph: Edge[][], src: number, n: number): number[] {
+// Dijkstra with parent tracking for path reconstruction (mirrors Java parent[] approach)
+function dijkstra(graph: Edge[][], src: number, n: number): { dist: number[]; parent: number[] } {
   const dist = new Array(n).fill(Infinity);
+  const parent = new Array(n).fill(-1);
   dist[src] = 0;
   const visited = new Array(n).fill(false);
-  // Min-heap via sorted insert (small n ≤ 50, perf is fine)
   const pq: [number, number][] = [[src, 0]];
 
   while (pq.length > 0) {
@@ -51,44 +52,56 @@ function dijkstra(graph: Edge[][], src: number, n: number): number[] {
     for (const e of graph[node]) {
       if (dist[node] + e.weight < dist[e.to]) {
         dist[e.to] = dist[node] + e.weight;
+        parent[e.to] = node;
         pq.push([e.to, dist[e.to]]);
       }
     }
   }
-  return dist;
+  return { dist, parent };
 }
 
-// Dijkstra + priority-based route planner (mirrors the Java algorithm)
-function optimizeRoute(bins: BinRecord[]): { route: BinRecord[]; totalDist: number; savedPct: number; steps: { bin: BinRecord; dist: number }[] } {
+// Reconstruct path from parent array (mirrors Java Collections.reverse approach)
+function reconstructPath(parent: number[], src: number, dest: number): number[] {
+  const path: number[] = [];
+  let temp = dest;
+  while (temp !== -1) {
+    path.push(temp);
+    temp = parent[temp];
+  }
+  path.reverse();
+  return path[0] === src ? path : [];
+}
+
+// Dijkstra + priority-based route planner with path reconstruction
+function optimizeRoute(bins: BinRecord[]): { route: BinRecord[]; totalDist: number; savedPct: number; steps: { bin: BinRecord; dist: number; path: string[] }[] } {
   if (bins.length === 0) return { route: [], totalDist: 0, savedPct: 0, steps: [] };
 
   const graph = buildGraph(bins);
   const n = bins.length;
 
-  // Sort by priority descending (like PriorityQueue in the Java code)
   const priorityOrder = [...bins].map((b, idx) => ({ bin: b, idx }))
     .sort((a, b) => b.bin.priority - a.bin.priority || b.bin.fillLevel - a.bin.fillLevel);
 
-  // Plan route: start at first high-priority bin, use Dijkstra for shortest path to each next target
   let truckPos = priorityOrder[0].idx;
   const route: BinRecord[] = [priorityOrder[0].bin];
-  const steps: { bin: BinRecord; dist: number }[] = [{ bin: priorityOrder[0].bin, dist: 0 }];
+  const steps: { bin: BinRecord; dist: number; path: string[] }[] = [{ bin: priorityOrder[0].bin, dist: 0, path: [priorityOrder[0].bin.binId] }];
   let totalDist = 0;
   const visited = new Set<number>([truckPos]);
 
   for (let i = 1; i < priorityOrder.length; i++) {
     const target = priorityOrder[i];
     if (visited.has(target.idx)) continue;
-    const dist = dijkstra(graph, truckPos, n);
+    const { dist, parent } = dijkstra(graph, truckPos, n);
     const d = dist[target.idx];
+    const pathIndices = reconstructPath(parent, truckPos, target.idx);
+    const pathNames = pathIndices.map(idx => bins[idx].binId);
     totalDist += d;
-    steps.push({ bin: target.bin, dist: parseFloat(d.toFixed(2)) });
+    steps.push({ bin: target.bin, dist: parseFloat(d.toFixed(2)), path: pathNames });
     route.push(target.bin);
     visited.add(target.idx);
     truckPos = target.idx;
   }
 
-  // Compare with naive sequential order distance
   let naiveDist = 0;
   for (let i = 1; i < bins.length; i++) {
     naiveDist += haversineKm(bins[i - 1], bins[i]);
