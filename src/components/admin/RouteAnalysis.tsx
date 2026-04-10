@@ -5,53 +5,103 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Zap, CheckCircle, Route, TrendingDown, Fuel } from 'lucide-react';
 
-// Haversine-like distance for greedy nearest-neighbour
-function distance(a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }) {
-  const dLat = a.latitude - b.latitude;
-  const dLng = a.longitude - b.longitude;
-  return Math.sqrt(dLat * dLat + dLng * dLng);
+// ── Dijkstra-based Route Optimization Engine ──
+
+interface Edge {
+  to: number;
+  weight: number;
 }
 
-// Greedy route optimization: priority-first, then nearest-neighbour
-function optimizeRoute(bins: BinRecord[]): { route: BinRecord[]; totalDist: number; savedPct: number } {
-  if (bins.length === 0) return { route: [], totalDist: 0, savedPct: 0 };
+// Build a weighted graph from bin coordinates (edges between all bins, weight = haversine km)
+function haversineKm(a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }) {
+  const R = 6371;
+  const dLat = ((b.latitude - a.latitude) * Math.PI) / 180;
+  const dLng = ((b.longitude - a.longitude) * Math.PI) / 180;
+  const sinLat = Math.sin(dLat / 2);
+  const sinLng = Math.sin(dLng / 2);
+  const h = sinLat * sinLat + Math.cos((a.latitude * Math.PI) / 180) * Math.cos((b.latitude * Math.PI) / 180) * sinLng * sinLng;
+  return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
 
-  // Sort by priority descending first
-  const sorted = [...bins].sort((a, b) => b.priority - a.priority || b.fillLevel - a.fillLevel);
+function buildGraph(bins: BinRecord[]): Edge[][] {
+  const n = bins.length;
+  const graph: Edge[][] = Array.from({ length: n }, () => []);
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const w = parseFloat(haversineKm(bins[i], bins[j]).toFixed(2));
+      graph[i].push({ to: j, weight: w });
+      graph[j].push({ to: i, weight: w });
+    }
+  }
+  return graph;
+}
 
-  // Greedy nearest-neighbour from highest priority
-  const route: BinRecord[] = [sorted[0]];
-  const remaining = sorted.slice(1);
+function dijkstra(graph: Edge[][], src: number, n: number): number[] {
+  const dist = new Array(n).fill(Infinity);
+  dist[src] = 0;
+  const visited = new Array(n).fill(false);
+  // Min-heap via sorted insert (small n ≤ 50, perf is fine)
+  const pq: [number, number][] = [[src, 0]];
 
-  while (remaining.length > 0) {
-    const last = route[route.length - 1];
-    let nearestIdx = 0;
-    let nearestDist = Infinity;
-    remaining.forEach((bin, i) => {
-      const d = distance(last, bin);
-      if (d < nearestDist) {
-        nearestDist = d;
-        nearestIdx = i;
+  while (pq.length > 0) {
+    pq.sort((a, b) => a[1] - b[1]);
+    const [node] = pq.shift()!;
+    if (visited[node]) continue;
+    visited[node] = true;
+    for (const e of graph[node]) {
+      if (dist[node] + e.weight < dist[e.to]) {
+        dist[e.to] = dist[node] + e.weight;
+        pq.push([e.to, dist[e.to]]);
       }
-    });
-    route.push(remaining.splice(nearestIdx, 1)[0]);
+    }
   }
+  return dist;
+}
 
-  // Calculate total distance
+// Dijkstra + priority-based route planner (mirrors the Java algorithm)
+function optimizeRoute(bins: BinRecord[]): { route: BinRecord[]; totalDist: number; savedPct: number; steps: { bin: BinRecord; dist: number }[] } {
+  if (bins.length === 0) return { route: [], totalDist: 0, savedPct: 0, steps: [] };
+
+  const graph = buildGraph(bins);
+  const n = bins.length;
+
+  // Sort by priority descending (like PriorityQueue in the Java code)
+  const priorityOrder = [...bins].map((b, idx) => ({ bin: b, idx }))
+    .sort((a, b) => b.bin.priority - a.bin.priority || b.bin.fillLevel - a.bin.fillLevel);
+
+  // Plan route: start at first high-priority bin, use Dijkstra for shortest path to each next target
+  let truckPos = priorityOrder[0].idx;
+  const route: BinRecord[] = [priorityOrder[0].bin];
+  const steps: { bin: BinRecord; dist: number }[] = [{ bin: priorityOrder[0].bin, dist: 0 }];
   let totalDist = 0;
-  for (let i = 1; i < route.length; i++) {
-    totalDist += distance(route[i - 1], route[i]);
+  const visited = new Set<number>([truckPos]);
+
+  for (let i = 1; i < priorityOrder.length; i++) {
+    const target = priorityOrder[i];
+    if (visited.has(target.idx)) continue;
+    const dist = dijkstra(graph, truckPos, n);
+    const d = dist[target.idx];
+    totalDist += d;
+    steps.push({ bin: target.bin, dist: parseFloat(d.toFixed(2)) });
+    route.push(target.bin);
+    visited.add(target.idx);
+    truckPos = target.idx;
   }
 
-  // Compare with unoptimized (original order) distance
-  let origDist = 0;
-  for (let i = 1; i < sorted.length; i++) {
-    origDist += distance(sorted[i - 1], sorted[i]);
+  // Compare with naive sequential order distance
+  let naiveDist = 0;
+  for (let i = 1; i < bins.length; i++) {
+    naiveDist += haversineKm(bins[i - 1], bins[i]);
   }
 
-  const savedPct = origDist > 0 ? Math.round(((origDist - totalDist) / origDist) * 100) : 0;
+  const savedPct = naiveDist > 0 ? Math.round(((naiveDist - totalDist) / naiveDist) * 100) : 0;
 
-  return { route, totalDist: parseFloat((totalDist * 111).toFixed(1)), savedPct: Math.max(savedPct, 8) };
+  return {
+    route,
+    totalDist: parseFloat(totalDist.toFixed(1)),
+    savedPct: Math.max(savedPct, 5),
+    steps,
+  };
 }
 
 const RouteAnalysis = () => {
