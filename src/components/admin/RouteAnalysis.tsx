@@ -4,6 +4,7 @@ import { routeDataset, getInitialBins } from '@/data/mockData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Zap, CheckCircle, Route, TrendingDown, Fuel } from 'lucide-react';
+import DepotReturnAnalysis from './DepotReturnAnalysis';
 
 // ── Dijkstra-based Route Optimization Engine ──
 
@@ -238,6 +239,9 @@ const RouteAnalysis = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Return-to-Depot Reverse Dijkstra */}
+      <DepotReturnAnalysis />
 
       {/* Existing Route Table */}
       <Card className="shadow-card">
