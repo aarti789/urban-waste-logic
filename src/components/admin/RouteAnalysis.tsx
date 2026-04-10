@@ -114,13 +114,14 @@ const RouteAnalysis = () => {
     const bins = getInitialBins().filter(b => !b.collected);
     const result = optimizeRoute(bins);
     setOptimizedRoute(result.route);
+    setRouteSteps(result.steps);
     setSavings({
       dist: result.totalDist,
       pct: result.savedPct,
       fuel: parseFloat((result.totalDist * 0.33 * result.savedPct / 100).toFixed(1)),
     });
     setOptimized(true);
-    console.log('[GreenRoute] Route optimized:', result.route.map(b => b.binId).join(' → '));
+    console.log('[GreenRoute] Dijkstra route optimized:', result.steps.map(s => `${s.bin.binId}(${s.dist}km)`).join(' → '));
   }, []);
 
   const statusColor = (s: string) => {
