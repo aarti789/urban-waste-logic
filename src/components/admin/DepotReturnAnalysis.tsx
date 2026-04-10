@@ -87,21 +87,17 @@ function multiPathToOne(graph: Edge[][], dest: number, n: number): number[] {
   return dist;
 }
 
-// Dynamic rank-based priority: sort by distance, assign P1 (closest) → PN (farthest)
-// Mirrors Java Collections.sort + sequential priority assignment
-function assignDynamicPriorities(items: { idx: number; dist: number }[]): Map<number, { label: string; rank: number }> {
-  const sorted = [...items].sort((a, b) => a.dist - b.dist);
-  const map = new Map<number, { label: string; rank: number }>();
-  sorted.forEach((item, i) => {
-    map.set(item.idx, { label: `P${i + 1}`, rank: i + 1 });
-  });
-  return map;
+// Dijkstra distance-based priority: P1 (≤3km, urgent), P2 (≤7km, moderate), P3 (>7km, low)
+// Mirrors Java getPriority(distance) logic
+function getDistancePriority(distance: number): { label: string; level: number } {
+  if (distance <= 3) return { label: 'P1', level: 1 };
+  if (distance <= 7) return { label: 'P2', level: 2 };
+  return { label: 'P3', level: 3 };
 }
 
-function priorityStyle(rank: number, total: number) {
-  const pct = rank / total;
-  if (pct <= 0.33) return 'bg-destructive/10 text-destructive border-destructive/20';
-  if (pct <= 0.66) return 'bg-warning/10 text-warning border-warning/20';
+function priorityStyle(level: number) {
+  if (level === 1) return 'bg-destructive/10 text-destructive border-destructive/20';
+  if (level === 2) return 'bg-warning/10 text-warning border-warning/20';
   return 'bg-success/10 text-success border-success/20';
 }
 
