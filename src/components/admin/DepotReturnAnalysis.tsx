@@ -231,12 +231,12 @@ const DepotReturnAnalysis = () => {
               </div>
             </div>
 
-            {/* Warning for far bins */}
-            {p3Count > 0 && (
+            {/* Warning for low-priority (far) bins */}
+            {lowCount > 0 && (
               <div className="p-2 rounded-lg bg-warning/10 border border-warning/20 flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-warning shrink-0" />
                 <p className="text-xs text-warning">
-                  {p3Count} bin{p3Count > 1 ? 's' : ''} classified as P3 (far from depot) — consider relay points or reassignment.
+                  {lowCount} bin{lowCount > 1 ? 's' : ''} ranked as low priority (farthest from depot) — consider relay points or reassignment.
                 </p>
               </div>
             )}
