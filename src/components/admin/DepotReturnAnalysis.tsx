@@ -160,9 +160,10 @@ const DepotReturnAnalysis = () => {
       depotResults.map(r => `${r.binId}(${r.distFromDepot}km→${r.priority.label})`).join(', '));
   }, []);
 
-  const p1Count = results.filter(r => r.priority.label === 'P1').length;
-  const p2Count = results.filter(r => r.priority.label === 'P2').length;
-  const p3Count = results.filter(r => r.priority.label === 'P3').length;
+  const third = Math.ceil(results.length / 3);
+  const highCount = results.filter((_, i) => i < third).length;
+  const medCount = results.filter((_, i) => i >= third && i < third * 2).length;
+  const lowCount = results.length - highCount - medCount;
 
   return (
     <Card className="shadow-card border-accent/20 bg-accent/5">
@@ -174,7 +175,7 @@ const DepotReturnAnalysis = () => {
               Return-to-Depot Analysis
             </h3>
             <p className="text-xs text-muted-foreground">
-              Dijkstra forward + reverse: computes distances & classifies priority (P1 ≤3km, P2 ≤7km, P3 &gt;7km).
+              Dijkstra forward + reverse: ranks bins by distance, assigns dynamic priority P1→PN (closest first).
             </p>
           </div>
           <Button size="sm" variant="outline" onClick={handleCompute} disabled={computed} className="gap-1.5 shrink-0">
@@ -188,23 +189,23 @@ const DepotReturnAnalysis = () => {
             <div className="p-3 rounded-lg bg-background border">
               <p className="text-xs font-medium mb-1">
                 Depot: <span className="text-primary font-bold">{depotName}</span>
-                <span className="text-muted-foreground ml-2">({results.length} bins analyzed)</span>
+                <span className="text-muted-foreground ml-2">({results.length} bins ranked by Dijkstra distance)</span>
               </p>
             </div>
 
-            {/* Distance-Priority Classification Summary */}
+            {/* Dynamic Priority Distribution */}
             <div className="grid grid-cols-3 gap-2">
               <div className="p-2 rounded-lg bg-background border text-center">
-                <p className="text-sm font-bold text-destructive">{p1Count}</p>
-                <p className="text-[10px] text-muted-foreground">P1 — High (≤3km)</p>
+                <p className="text-sm font-bold text-destructive">{highCount}</p>
+                <p className="text-[10px] text-muted-foreground">High Priority (top ⅓)</p>
               </div>
               <div className="p-2 rounded-lg bg-background border text-center">
-                <p className="text-sm font-bold text-warning">{p2Count}</p>
-                <p className="text-[10px] text-muted-foreground">P2 — Medium (≤7km)</p>
+                <p className="text-sm font-bold text-warning">{medCount}</p>
+                <p className="text-[10px] text-muted-foreground">Medium Priority (mid ⅓)</p>
               </div>
               <div className="p-2 rounded-lg bg-background border text-center">
-                <p className="text-sm font-bold text-success">{p3Count}</p>
-                <p className="text-[10px] text-muted-foreground">P3 — Low (&gt;7km)</p>
+                <p className="text-sm font-bold text-success">{lowCount}</p>
+                <p className="text-[10px] text-muted-foreground">Low Priority (bottom ⅓)</p>
               </div>
             </div>
 
