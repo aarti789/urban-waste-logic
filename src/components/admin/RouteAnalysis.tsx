@@ -190,6 +190,32 @@ const RouteAnalysis = () => {
               </div>
             </div>
           )}
+
+          {optimized && routeSteps.length > 0 && (
+            <div className="mt-3 p-3 rounded-lg bg-background border">
+              <p className="text-xs font-medium mb-2">Dijkstra Shortest Path Steps:</p>
+              <div className="space-y-1">
+                {routeSteps.slice(0, 8).map((step, i) => (
+                  <div key={step.bin.id} className="flex items-center gap-2 text-xs">
+                    <span className="w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-[10px]">{i + 1}</span>
+                    <span className="font-medium">{step.bin.binId}</span>
+                    <span className="text-muted-foreground">→</span>
+                    <span className={`px-1.5 py-0.5 rounded border ${
+                      step.bin.priority === 3 ? 'bg-destructive/10 text-destructive border-destructive/20' :
+                      step.bin.priority === 2 ? 'bg-warning/10 text-warning border-warning/20' :
+                      'bg-success/10 text-success border-success/20'
+                    }`}>
+                      P{step.bin.priority}
+                    </span>
+                    <span className="text-muted-foreground ml-auto">{step.dist} km</span>
+                  </div>
+                ))}
+                {routeSteps.length > 8 && (
+                  <p className="text-xs text-muted-foreground">+{routeSteps.length - 8} more steps</p>
+                )}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
