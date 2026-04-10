@@ -107,6 +107,7 @@ function optimizeRoute(bins: BinRecord[]): { route: BinRecord[]; totalDist: numb
 const RouteAnalysis = () => {
   const [optimized, setOptimized] = useState(false);
   const [optimizedRoute, setOptimizedRoute] = useState<BinRecord[] | null>(null);
+  const [routeSteps, setRouteSteps] = useState<{ bin: BinRecord; dist: number }[]>([]);
   const [savings, setSavings] = useState({ dist: 0, pct: 0, fuel: 0 });
 
   const handleOptimize = useCallback(() => {
