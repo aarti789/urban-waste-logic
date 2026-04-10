@@ -183,19 +183,19 @@ const DepotReturnAnalysis = () => {
               </p>
             </div>
 
-            {/* Dynamic Priority Distribution */}
+            {/* Dijkstra Distance-Based Priority Distribution */}
             <div className="grid grid-cols-3 gap-2">
               <div className="p-2 rounded-lg bg-background border text-center">
-                <p className="text-sm font-bold text-destructive">{highCount}</p>
-                <p className="text-[10px] text-muted-foreground">High Priority (top ⅓)</p>
+                <p className="text-sm font-bold text-destructive">{p1Count}</p>
+                <p className="text-[10px] text-muted-foreground">P1 — High (≤3km)</p>
               </div>
               <div className="p-2 rounded-lg bg-background border text-center">
-                <p className="text-sm font-bold text-warning">{medCount}</p>
-                <p className="text-[10px] text-muted-foreground">Medium Priority (mid ⅓)</p>
+                <p className="text-sm font-bold text-warning">{p2Count}</p>
+                <p className="text-[10px] text-muted-foreground">P2 — Medium (≤7km)</p>
               </div>
               <div className="p-2 rounded-lg bg-background border text-center">
-                <p className="text-sm font-bold text-success">{lowCount}</p>
-                <p className="text-[10px] text-muted-foreground">Low Priority (bottom ⅓)</p>
+                <p className="text-sm font-bold text-success">{p3Count}</p>
+                <p className="text-[10px] text-muted-foreground">P3 — Low (&gt;7km)</p>
               </div>
             </div>
 
@@ -221,12 +221,12 @@ const DepotReturnAnalysis = () => {
               </div>
             </div>
 
-            {/* Warning for low-priority (far) bins */}
-            {lowCount > 0 && (
+            {/* Warning for P3 (far) bins */}
+            {p3Count > 0 && (
               <div className="p-2 rounded-lg bg-warning/10 border border-warning/20 flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-warning shrink-0" />
                 <p className="text-xs text-warning">
-                  {lowCount} bin{lowCount > 1 ? 's' : ''} ranked as low priority (farthest from depot) — consider relay points or reassignment.
+                  {p3Count} bin{p3Count > 1 ? 's' : ''} classified as P3 (&gt;7km from depot) — consider relay points or reassignment.
                 </p>
               </div>
             )}
