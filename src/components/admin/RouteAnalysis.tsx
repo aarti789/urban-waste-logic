@@ -124,6 +124,17 @@ const RouteAnalysis = () => {
   const [optimizedRoute, setOptimizedRoute] = useState<BinRecord[] | null>(null);
   const [routeSteps, setRouteSteps] = useState<{ bin: BinRecord; dist: number; path: string[] }[]>([]);
   const [savings, setSavings] = useState({ dist: 0, pct: 0, fuel: 0 });
+  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
+
+  const allBins = useMemo(() => getInitialBins(), []);
+
+  // Bins belonging to the selected route
+  const selectedRouteBins = useMemo(() => {
+    if (!selectedRouteId) return [];
+    const route = routeDataset.find(r => r.routeId === selectedRouteId);
+    if (!route) return [];
+    return allBins.filter(b => route.bins.includes(b.binId.replace('HYD-', '')));
+  }, [selectedRouteId, allBins]);
 
   const handleOptimize = useCallback(() => {
     const bins = getInitialBins().filter(b => !b.collected);
