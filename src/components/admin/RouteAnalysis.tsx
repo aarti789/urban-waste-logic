@@ -277,8 +277,15 @@ const RouteAnalysis = () => {
               </thead>
               <tbody>
                 {routeDataset.map(r => (
-                  <tr key={r.routeId} className="border-b last:border-0">
-                    <td className="py-2.5 pr-3 font-medium">{r.routeId}</td>
+                  <tr
+                    key={r.routeId}
+                    className={`border-b last:border-0 cursor-pointer transition-colors hover:bg-muted/50 ${selectedRouteId === r.routeId ? 'bg-primary/10' : ''}`}
+                    onClick={() => setSelectedRouteId(prev => prev === r.routeId ? null : r.routeId)}
+                  >
+                    <td className="py-2.5 pr-3 font-medium flex items-center gap-1.5">
+                      {selectedRouteId === r.routeId && <MapPin className="w-3 h-3 text-primary" />}
+                      {r.routeId}
+                    </td>
                     <td className="py-2.5 pr-3">{r.truckNumber}</td>
                     <td className="py-2.5 pr-3 text-xs">{r.zone}</td>
                     <td className="py-2.5 pr-3">{r.bins.length}</td>
@@ -297,6 +304,11 @@ const RouteAnalysis = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Map for selected route */}
+      {selectedRouteId && selectedRouteBins.length > 0 && (
+        <BinMap bins={selectedRouteBins} selectedRouteId={selectedRouteId} />
+      )}
     </div>
   );
 };
