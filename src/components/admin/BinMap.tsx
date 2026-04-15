@@ -11,6 +11,7 @@ import 'leaflet/dist/leaflet.css';
 interface Props {
   bins: BinRecord[];
   onSelectBin?: (bin: BinRecord) => void;
+  selectedRouteId?: string;
 }
 
 const PRIORITY_COLORS: Record<number, string> = {
