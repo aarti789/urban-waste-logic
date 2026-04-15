@@ -11,6 +11,7 @@ import 'leaflet/dist/leaflet.css';
 interface Props {
   bins: BinRecord[];
   onSelectBin?: (bin: BinRecord) => void;
+  selectedRouteId?: string;
 }
 
 const PRIORITY_COLORS: Record<number, string> = {
@@ -82,8 +83,8 @@ const FitBounds = ({ coords }: { coords: [number, number][] }) => {
   return null;
 };
 
-const BinMap = ({ bins, onSelectBin }: Props) => {
-  const [selectedRoute, setSelectedRoute] = useState<string>('all');
+const BinMap = ({ bins, onSelectBin, selectedRouteId }: Props) => {
+  const [selectedRoute, setSelectedRoute] = useState<string>(selectedRouteId || 'all');
 
   // Lookup: bin code → BinRecord
   const binCodeMap = useMemo(() => {

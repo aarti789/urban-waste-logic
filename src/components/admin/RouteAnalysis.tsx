@@ -3,8 +3,9 @@ import { BinRecord } from '@/types';
 import { routeDataset, getInitialBins } from '@/data/mockData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Zap, CheckCircle, Route, TrendingDown, Fuel } from 'lucide-react';
+import { Zap, CheckCircle, Route, TrendingDown, Fuel, MapPin } from 'lucide-react';
 import DepotReturnAnalysis from './DepotReturnAnalysis';
+import BinMap from './BinMap';
 
 // ── Dijkstra-based Route Optimization Engine ──
 
@@ -123,6 +124,17 @@ const RouteAnalysis = () => {
   const [optimizedRoute, setOptimizedRoute] = useState<BinRecord[] | null>(null);
   const [routeSteps, setRouteSteps] = useState<{ bin: BinRecord; dist: number; path: string[] }[]>([]);
   const [savings, setSavings] = useState({ dist: 0, pct: 0, fuel: 0 });
+  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
+
+  const allBins = useMemo(() => getInitialBins(), []);
+
+  // Bins belonging to the selected route
+  const selectedRouteBins = useMemo(() => {
+    if (!selectedRouteId) return [];
+    const route = routeDataset.find(r => r.routeId === selectedRouteId);
+    if (!route) return [];
+    return allBins.filter(b => route.bins.includes(b.binId.replace('HYD-', '')));
+  }, [selectedRouteId, allBins]);
 
   const handleOptimize = useCallback(() => {
     const bins = getInitialBins().filter(b => !b.collected);
@@ -265,8 +277,15 @@ const RouteAnalysis = () => {
               </thead>
               <tbody>
                 {routeDataset.map(r => (
-                  <tr key={r.routeId} className="border-b last:border-0">
-                    <td className="py-2.5 pr-3 font-medium">{r.routeId}</td>
+                  <tr
+                    key={r.routeId}
+                    className={`border-b last:border-0 cursor-pointer transition-colors hover:bg-muted/50 ${selectedRouteId === r.routeId ? 'bg-primary/10' : ''}`}
+                    onClick={() => setSelectedRouteId(prev => prev === r.routeId ? null : r.routeId)}
+                  >
+                    <td className="py-2.5 pr-3 font-medium flex items-center gap-1.5">
+                      {selectedRouteId === r.routeId && <MapPin className="w-3 h-3 text-primary" />}
+                      {r.routeId}
+                    </td>
                     <td className="py-2.5 pr-3">{r.truckNumber}</td>
                     <td className="py-2.5 pr-3 text-xs">{r.zone}</td>
                     <td className="py-2.5 pr-3">{r.bins.length}</td>
@@ -285,6 +304,11 @@ const RouteAnalysis = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Map for selected route */}
+      {selectedRouteId && selectedRouteBins.length > 0 && (
+        <BinMap bins={selectedRouteBins} selectedRouteId={selectedRouteId} />
+      )}
     </div>
   );
 };
