@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Polyline, Popup, Tooltip, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet-polylinedecorator';
 import { BinRecord } from '@/types';
@@ -19,8 +19,8 @@ const PRIORITY_COLORS: Record<number, string> = {
   1: '#22c55e',
 };
 
-// Component to draw a decorated polyline with arrows
-const ArrowPolyline = ({ coords, routeId, truckNumber, zone }: { coords: [number, number][]; routeId: string; truckNumber: string; zone: string }) => {
+// Draws a single route with polyline + arrows + start/end markers, cleans up on unmount/change
+const RouteLayer = ({ coords, routeId, truckNumber, zone }: { coords: [number, number][]; routeId: string; truckNumber: string; zone: string }) => {
   const map = useMap();
   const layerRef = useRef<L.LayerGroup | null>(null);
 
@@ -29,15 +29,15 @@ const ArrowPolyline = ({ coords, routeId, truckNumber, zone }: { coords: [number
 
     const polyline = L.polyline(coords, {
       color: '#3b82f6',
-      weight: 4,
-      opacity: 0.8,
+      weight: 5,
+      opacity: 0.85,
     });
 
     const decorator = (L as any).polylineDecorator(polyline, {
       patterns: [
         {
-          offset: '30%',
-          repeat: 100,
+          offset: '25%',
+          repeat: 120,
           symbol: (L as any).Symbol.arrowHead({
             pixelSize: 12,
             pathOptions: { fillOpacity: 1, weight: 0, color: '#3b82f6' },
@@ -46,14 +46,24 @@ const ArrowPolyline = ({ coords, routeId, truckNumber, zone }: { coords: [number
       ],
     });
 
-    const group = L.layerGroup([polyline, decorator]).addTo(map);
     polyline.bindTooltip(`${routeId} · ${truckNumber} · ${zone}`, { sticky: true });
 
+    // Start & End markers
+    const startMarker = L.circleMarker(L.latLng(coords[0][0], coords[0][1]), {
+      radius: 10, fillColor: '#22c55e', color: '#fff', weight: 3, fillOpacity: 1,
+    }).bindPopup(`<b>Start</b><br/>${routeId}`);
+
+    const endMarker = L.circleMarker(L.latLng(coords[coords.length - 1][0], coords[coords.length - 1][1]), {
+      radius: 10, fillColor: '#ef4444', color: '#fff', weight: 3, fillOpacity: 1,
+    }).bindPopup(`<b>End</b><br/>${routeId}`);
+
+    const group = L.layerGroup([polyline, decorator, startMarker, endMarker]).addTo(map);
     layerRef.current = group;
 
     return () => {
       if (layerRef.current) {
         map.removeLayer(layerRef.current);
+        layerRef.current = null;
       }
     };
   }, [map, coords, routeId, truckNumber, zone]);
@@ -61,12 +71,12 @@ const ArrowPolyline = ({ coords, routeId, truckNumber, zone }: { coords: [number
   return null;
 };
 
-// Component to fit map bounds to selected route
+// Fit map to selected route bounds
 const FitBounds = ({ coords }: { coords: [number, number][] }) => {
   const map = useMap();
   useEffect(() => {
     if (coords.length >= 2) {
-      map.fitBounds(L.latLngBounds(coords.map(c => L.latLng(c[0], c[1]))), { padding: [40, 40] });
+      map.fitBounds(L.latLngBounds(coords.map(c => L.latLng(c[0], c[1]))), { padding: [50, 50] });
     }
   }, [map, coords]);
   return null;
@@ -75,6 +85,7 @@ const FitBounds = ({ coords }: { coords: [number, number][] }) => {
 const BinMap = ({ bins, onSelectBin }: Props) => {
   const [selectedRoute, setSelectedRoute] = useState<string>('all');
 
+  // Lookup: bin code → BinRecord
   const binCodeMap = useMemo(() => {
     const map: Record<string, BinRecord> = {};
     bins.forEach(b => {
@@ -84,6 +95,7 @@ const BinMap = ({ bins, onSelectBin }: Props) => {
     return map;
   }, [bins]);
 
+  // Build per-route coordinate arrays (grouped, not global)
   const routeLines = useMemo(() => {
     return routeDataset.map(route => {
       const flowStr = route.binFlow.replace(/\s*\(.*?\)\s*/g, '');
@@ -97,11 +109,13 @@ const BinMap = ({ bins, onSelectBin }: Props) => {
     }).filter(r => r.coords.length >= 2);
   }, [binCodeMap]);
 
+  // Show ONLY the selected route (or none when "all")
   const visibleRoutes = useMemo(() => {
-    if (selectedRoute === 'all') return routeLines;
+    if (selectedRoute === 'all') return [];
     return routeLines.filter(r => r.routeId === selectedRoute);
   }, [routeLines, selectedRoute]);
 
+  // Coords for fitting bounds
   const selectedCoords = useMemo(() => {
     if (selectedRoute !== 'all') {
       const route = routeLines.find(r => r.routeId === selectedRoute);
@@ -118,19 +132,6 @@ const BinMap = ({ bins, onSelectBin }: Props) => {
         <div className="flex items-center justify-between flex-wrap gap-2">
           <CardTitle className="text-sm">Hyderabad Bin Map</CardTitle>
           <div className="flex items-center gap-3">
-            <Select value={selectedRoute} onValueChange={setSelectedRoute}>
-              <SelectTrigger className="w-[200px] h-8 text-xs">
-                <SelectValue placeholder="Select Route" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Routes</SelectItem>
-                {routeDataset.map(route => (
-                  <SelectItem key={route.routeId} value={route.routeId}>
-                    {route.routeId} · {route.zone}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
             <div className="flex items-center gap-3 text-xs">
               {[
                 { color: PRIORITY_COLORS[3], label: 'High' },
@@ -144,6 +145,19 @@ const BinMap = ({ bins, onSelectBin }: Props) => {
                 </span>
               ))}
             </div>
+            <Select value={selectedRoute} onValueChange={setSelectedRoute}>
+              <SelectTrigger className="w-[200px] h-8 text-xs">
+                <SelectValue placeholder="Select Route" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Routes</SelectItem>
+                {routeDataset.map(route => (
+                  <SelectItem key={route.routeId} value={route.routeId}>
+                    {route.routeId} · {route.zone}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </CardHeader>
@@ -160,12 +174,12 @@ const BinMap = ({ bins, onSelectBin }: Props) => {
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
 
-            {/* Fit bounds when a specific route is selected */}
+            {/* Zoom to selected route */}
             {selectedCoords.length >= 2 && <FitBounds coords={selectedCoords} />}
 
-            {/* Route lines with arrows */}
+            {/* Draw ONLY the selected route — no spider web */}
             {visibleRoutes.map(route => (
-              <ArrowPolyline
+              <RouteLayer
                 key={route.routeId}
                 coords={route.coords}
                 routeId={route.routeId}
@@ -174,7 +188,7 @@ const BinMap = ({ bins, onSelectBin }: Props) => {
               />
             ))}
 
-            {/* Bin markers */}
+            {/* Bin markers always visible */}
             {bins.map(bin => (
               <CircleMarker
                 key={bin.id}
