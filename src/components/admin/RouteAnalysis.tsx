@@ -3,8 +3,9 @@ import { BinRecord } from '@/types';
 import { routeDataset, getInitialBins } from '@/data/mockData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Zap, CheckCircle, Route, TrendingDown, Fuel } from 'lucide-react';
+import { Zap, CheckCircle, Route, TrendingDown, Fuel, MapPin } from 'lucide-react';
 import DepotReturnAnalysis from './DepotReturnAnalysis';
+import BinMap from './BinMap';
 
 // ── Dijkstra-based Route Optimization Engine ──
 
