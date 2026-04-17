@@ -240,21 +240,41 @@ const BinMap = ({ bins, onSelectBin, selectedRouteId }: Props) => {
             ))}
           </MapContainer>
         </div>
-        <div className="flex items-center justify-end gap-2 pt-1">
-          <span className="text-xs text-muted-foreground">Route:</span>
-          <Select value={selectedRoute} onValueChange={setSelectedRoute}>
-            <SelectTrigger className="w-[220px] h-8 text-xs">
-              <SelectValue placeholder="Select Route" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Routes</SelectItem>
-              {routeDataset.map(route => (
-                <SelectItem key={route.routeId} value={route.routeId}>
-                  {route.routeId} · {route.zone}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="pt-2 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">
+              Select Route {selectedRoute !== 'all' && <span className="text-foreground">· {selectedRoute}</span>}
+            </span>
+            <span className="text-[10px] text-muted-foreground">
+              {selectedRoute === 'all' ? `${routeDataset.length} routes shown` : '1 route shown'}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5 p-2 rounded-md border bg-muted/30 max-h-32 overflow-y-auto">
+            <button
+              onClick={() => setSelectedRoute('all')}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors border ${
+                selectedRoute === 'all'
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-background hover:bg-accent border-border'
+              }`}
+            >
+              All Routes
+            </button>
+            {routeDataset.map(route => (
+              <button
+                key={route.routeId}
+                onClick={() => setSelectedRoute(route.routeId)}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors border ${
+                  selectedRoute === route.routeId
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-background hover:bg-accent border-border'
+                }`}
+                title={`${route.routeId} · ${route.zone} · ${route.truckNumber}`}
+              >
+                {route.routeId}
+              </button>
+            ))}
+          </div>
         </div>
       </CardContent>
     </Card>
