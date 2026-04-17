@@ -20,8 +20,19 @@ const PRIORITY_COLORS: Record<number, string> = {
   1: '#22c55e',
 };
 
+// Jawahar Nagar Dumpyard near Kapra — common endpoint for all routes
+const DUMPYARD: [number, number] = [17.5215, 78.5860];
+const DUMPYARD_NAME = 'Jawahar Nagar Dumpyard';
+
+// Distinct palette for "All Routes" view
+const ROUTE_PALETTE = [
+  '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6',
+  '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16',
+  '#06b6d4', '#a855f7', '#eab308', '#22c55e', '#dc2626',
+];
+
 // Draws a single route with polyline + arrows + start/end markers, cleans up on unmount/change
-const RouteLayer = ({ coords, routeId, truckNumber, zone }: { coords: [number, number][]; routeId: string; truckNumber: string; zone: string }) => {
+const RouteLayer = ({ coords, routeId, truckNumber, zone, color }: { coords: [number, number][]; routeId: string; truckNumber: string; zone: string; color: string }) => {
   const map = useMap();
   const layerRef = useRef<L.LayerGroup | null>(null);
 
@@ -29,7 +40,7 @@ const RouteLayer = ({ coords, routeId, truckNumber, zone }: { coords: [number, n
     if (coords.length < 2) return;
 
     const polyline = L.polyline(coords, {
-      color: '#3b82f6',
+      color,
       weight: 5,
       opacity: 0.85,
     });
@@ -41,7 +52,7 @@ const RouteLayer = ({ coords, routeId, truckNumber, zone }: { coords: [number, n
           repeat: 120,
           symbol: (L as any).Symbol.arrowHead({
             pixelSize: 12,
-            pathOptions: { fillOpacity: 1, weight: 0, color: '#3b82f6' },
+            pathOptions: { fillOpacity: 1, weight: 0, color },
           }),
         },
       ],
@@ -49,16 +60,12 @@ const RouteLayer = ({ coords, routeId, truckNumber, zone }: { coords: [number, n
 
     polyline.bindTooltip(`${routeId} · ${truckNumber} · ${zone}`, { sticky: true });
 
-    // Start & End markers
+    // Start marker only (end is the shared dumpyard, drawn separately)
     const startMarker = L.circleMarker(L.latLng(coords[0][0], coords[0][1]), {
-      radius: 10, fillColor: '#22c55e', color: '#fff', weight: 3, fillOpacity: 1,
-    }).bindPopup(`<b>Start</b><br/>${routeId}`);
+      radius: 8, fillColor: color, color: '#fff', weight: 2, fillOpacity: 1,
+    }).bindPopup(`<b>Start</b><br/>${routeId} · ${zone}`);
 
-    const endMarker = L.circleMarker(L.latLng(coords[coords.length - 1][0], coords[coords.length - 1][1]), {
-      radius: 10, fillColor: '#ef4444', color: '#fff', weight: 3, fillOpacity: 1,
-    }).bindPopup(`<b>End</b><br/>${routeId}`);
-
-    const group = L.layerGroup([polyline, decorator, startMarker, endMarker]).addTo(map);
+    const group = L.layerGroup([polyline, decorator, startMarker]).addTo(map);
     layerRef.current = group;
 
     return () => {
@@ -67,8 +74,27 @@ const RouteLayer = ({ coords, routeId, truckNumber, zone }: { coords: [number, n
         layerRef.current = null;
       }
     };
-  }, [map, coords, routeId, truckNumber, zone]);
+  }, [map, coords, routeId, truckNumber, zone, color]);
 
+  return null;
+};
+
+// Renders the shared dumpyard endpoint marker
+const DumpyardMarker = () => {
+  const map = useMap();
+  useEffect(() => {
+    const icon = L.divIcon({
+      className: 'dumpyard-marker',
+      html: `<div style="background:#7c2d12;color:#fff;border:3px solid #fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.4);">🏭</div>`,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+    });
+    const marker = L.marker(DUMPYARD, { icon, zIndexOffset: 1000 })
+      .bindPopup(`<b>${DUMPYARD_NAME}</b><br/>Near Kapra<br/><i>Final disposal endpoint</i>`)
+      .bindTooltip(DUMPYARD_NAME, { permanent: false, direction: 'top' })
+      .addTo(map);
+    return () => { map.removeLayer(marker); };
+  }, [map]);
   return null;
 };
 
