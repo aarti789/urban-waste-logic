@@ -122,9 +122,9 @@ const BinMap = ({ bins, onSelectBin, selectedRouteId }: Props) => {
     return map;
   }, [bins]);
 
-  // Build per-route coordinate arrays (grouped, not global)
+  // Build per-route coordinate arrays. All routes terminate at the shared dumpyard.
   const routeLines = useMemo(() => {
-    return routeDataset.map(route => {
+    return routeDataset.map((route, idx) => {
       const flowStr = route.binFlow.replace(/\s*\(.*?\)\s*/g, '');
       const codes = flowStr.split('→').map(s => s.trim()).filter(Boolean);
       const coords: [number, number][] = [];
@@ -132,17 +132,26 @@ const BinMap = ({ bins, onSelectBin, selectedRouteId }: Props) => {
         const bin = binCodeMap[code];
         if (bin) coords.push([bin.latitude, bin.longitude]);
       });
-      return { routeId: route.routeId, truckNumber: route.truckNumber, zone: route.zone, coords };
+      if (coords.length >= 1) coords.push(DUMPYARD);
+      return {
+        routeId: route.routeId,
+        truckNumber: route.truckNumber,
+        zone: route.zone,
+        coords,
+        color: ROUTE_PALETTE[idx % ROUTE_PALETTE.length],
+      };
     }).filter(r => r.coords.length >= 2);
   }, [binCodeMap]);
 
-  // Show ONLY the selected route (or none when "all")
+  // "all" → all routes in distinct colors; otherwise just the selected route in blue
   const visibleRoutes = useMemo(() => {
-    if (selectedRoute === 'all') return [];
-    return routeLines.filter(r => r.routeId === selectedRoute);
+    if (selectedRoute === 'all') return routeLines;
+    return routeLines
+      .filter(r => r.routeId === selectedRoute)
+      .map(r => ({ ...r, color: '#3b82f6' }));
   }, [routeLines, selectedRoute]);
 
-  // Coords for fitting bounds
+  // Fit-bounds only when a specific route is selected
   const selectedCoords = useMemo(() => {
     if (selectedRoute !== 'all') {
       const route = routeLines.find(r => r.routeId === selectedRoute);
