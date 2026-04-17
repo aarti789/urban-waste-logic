@@ -167,37 +167,22 @@ const BinMap = ({ bins, onSelectBin, selectedRouteId }: Props) => {
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <CardTitle className="text-sm">Hyderabad Bin Map</CardTitle>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-3 text-xs">
-              {[
-                { color: PRIORITY_COLORS[3], label: 'High' },
-                { color: PRIORITY_COLORS[2], label: 'Medium' },
-                { color: PRIORITY_COLORS[1], label: 'Low' },
-                { color: '#3b82f6', label: 'Route' },
-              ].map(item => (
-                <span key={item.label} className="flex items-center gap-1">
-                  <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: item.color }} />
-                  {item.label}
-                </span>
-              ))}
-            </div>
-            <Select value={selectedRoute} onValueChange={setSelectedRoute}>
-              <SelectTrigger className="w-[200px] h-8 text-xs">
-                <SelectValue placeholder="Select Route" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Routes</SelectItem>
-                {routeDataset.map(route => (
-                  <SelectItem key={route.routeId} value={route.routeId}>
-                    {route.routeId} · {route.zone}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex items-center gap-3 text-xs">
+            {[
+              { color: PRIORITY_COLORS[3], label: 'High' },
+              { color: PRIORITY_COLORS[2], label: 'Medium' },
+              { color: PRIORITY_COLORS[1], label: 'Low' },
+              { color: '#3b82f6', label: 'Route' },
+            ].map(item => (
+              <span key={item.label} className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: item.color }} />
+                {item.label}
+              </span>
+            ))}
           </div>
         </div>
       </CardHeader>
-      <CardContent className="p-2">
+      <CardContent className="p-2 space-y-2">
         <div className="rounded-lg overflow-hidden" style={{ height: 500 }}>
           <MapContainer
             center={center}
@@ -254,6 +239,22 @@ const BinMap = ({ bins, onSelectBin, selectedRouteId }: Props) => {
               </CircleMarker>
             ))}
           </MapContainer>
+        </div>
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <span className="text-xs text-muted-foreground">Route:</span>
+          <Select value={selectedRoute} onValueChange={setSelectedRoute}>
+            <SelectTrigger className="w-[220px] h-8 text-xs">
+              <SelectValue placeholder="Select Route" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Routes</SelectItem>
+              {routeDataset.map(route => (
+                <SelectItem key={route.routeId} value={route.routeId}>
+                  {route.routeId} · {route.zone}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </CardContent>
     </Card>
