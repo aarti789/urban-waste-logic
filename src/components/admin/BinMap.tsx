@@ -213,7 +213,10 @@ const BinMap = ({ bins, onSelectBin, selectedRouteId }: Props) => {
             {/* Zoom to selected route */}
             {selectedCoords.length >= 2 && <FitBounds coords={selectedCoords} />}
 
-            {/* Draw ONLY the selected route — no spider web */}
+            {/* Shared dumpyard endpoint marker */}
+            <DumpyardMarker />
+
+            {/* Routes: all (multi-color) or single selected (blue) */}
             {visibleRoutes.map(route => (
               <RouteLayer
                 key={route.routeId}
@@ -221,6 +224,7 @@ const BinMap = ({ bins, onSelectBin, selectedRouteId }: Props) => {
                 routeId={route.routeId}
                 truckNumber={route.truckNumber}
                 zone={route.zone}
+                color={route.color}
               />
             ))}
 
