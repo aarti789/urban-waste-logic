@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { BinRecord, AreaType, WasteType, Zone, CollectionRecord } from '@/types';
-import { getInitialBins, saveBins, getCollectionHistory, saveCollectionHistory } from '@/data/mockData';
+import { getInitialBins, saveBins, getCollectionHistory, saveCollectionHistory, fuseFillLevel, BIN_UPDATE_EVENT } from '@/data/mockData';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -57,9 +57,31 @@ const WorkerDashboard = () => {
     toast({ title: 'Bin collected', description: `${bin.binId} marked as collected` });
   };
 
+  // Live sync: react to bin updates from any source (admin drift, other tabs).
+  React.useEffect(() => {
+    const handler = () => {
+      setBins(getInitialBins());
+      setHistory(getCollectionHistory());
+    };
+    window.addEventListener(BIN_UPDATE_EVENT, handler);
+    window.addEventListener('focus', handler);
+    return () => {
+      window.removeEventListener(BIN_UPDATE_EVENT, handler);
+      window.removeEventListener('focus', handler);
+    };
+  }, []);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const fillLevel = parseInt(form.fillLevel);
+    const incomingFill = parseInt(form.fillLevel);
+
+    // Fusion: when updating an existing bin, blend incoming observation with stored history.
+    let finalFill = incomingFill;
+    if (editingId) {
+      const existing = bins.find(b => b.id === editingId);
+      if (existing) finalFill = fuseFillLevel(existing.fillLevel, incomingFill);
+    }
+
     const newRecord: BinRecord = {
       id: editingId || `rec-${Date.now()}`,
       binId: form.binId,
@@ -70,12 +92,12 @@ const WorkerDashboard = () => {
       latitude: parseFloat(form.latitude),
       longitude: parseFloat(form.longitude),
       capacity: parseFloat(form.capacity),
-      fillLevel,
+      fillLevel: finalFill,
       wasteType: form.wasteType,
       dateObserved: form.dateObserved,
       assignedTruck: form.assignedTruck,
       remarks: form.remarks || undefined,
-      priority: getPriority(fillLevel),
+      priority: getPriority(finalFill),
       collected: false,
       createdAt: editingId ? bins.find(b => b.id === editingId)?.createdAt || new Date().toISOString() : new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -92,7 +114,12 @@ const WorkerDashboard = () => {
     setForm(emptyForm);
     setEditingId(null);
     setShowForm(false);
-    toast({ title: editingId ? 'Record updated' : 'Bin added', description: `${form.binId} saved successfully` });
+    toast({
+      title: editingId ? 'Record updated' : 'Bin added',
+      description: editingId
+        ? `${form.binId} fused fill level: ${finalFill}% (worker reported ${incomingFill}%)`
+        : `${form.binId} saved successfully`,
+    });
   };
 
   const startEdit = (bin: BinRecord) => {

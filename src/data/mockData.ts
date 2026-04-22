@@ -194,6 +194,14 @@ function generateRealBins(): BinRecord[] {
   });
 }
 
+// ===== DYNAMIC DATA EVENT BUS =====
+// Components subscribe via window event so updates propagate in real time.
+export const BIN_UPDATE_EVENT = 'greenroute:bins-updated';
+
+function emitBinsUpdated() {
+  try { window.dispatchEvent(new CustomEvent(BIN_UPDATE_EVENT)); } catch {}
+}
+
 export function getInitialBins(): BinRecord[] {
   const stored = localStorage.getItem('greenroute_bins_v2');
   if (stored) {
@@ -207,6 +215,160 @@ export function getInitialBins(): BinRecord[] {
 
 export function saveBins(bins: BinRecord[]) {
   localStorage.setItem('greenroute_bins_v2', JSON.stringify(bins));
+  emitBinsUpdated();
+}
+
+// ===== FILL-LEVEL FUSION =====
+// Blend incoming worker observation with historical stored value.
+// Recent worker input weighted higher (0.7) than stored history (0.3),
+// but if worker reports a HIGHER value (real overflow) we trust it fully.
+export function fuseFillLevel(historical: number, incoming: number): number {
+  if (incoming >= historical) return Math.min(100, Math.round(incoming));
+  const blended = historical * 0.3 + incoming * 0.7;
+  return Math.max(0, Math.min(100, Math.round(blended)));
+}
+
+// Find a bin by code, location name, or nearest coordinates.
+export function findBin(
+  bins: BinRecord[],
+  query: { binCode?: string; locationName?: string; lat?: number; lng?: number }
+): BinRecord | undefined {
+  if (query.binCode) {
+    const code = query.binCode.replace(/^HYD-/i, '').toUpperCase();
+    return bins.find(b => b.binId.replace('HYD-', '').toUpperCase() === code);
+  }
+  if (query.locationName) {
+    const q = query.locationName.toLowerCase();
+    return bins.find(b => b.locationName.toLowerCase().includes(q));
+  }
+  if (query.lat != null && query.lng != null) {
+    let best: BinRecord | undefined;
+    let bestD = Infinity;
+    bins.forEach(b => {
+      const d = haversineKm(b.latitude, b.longitude, query.lat!, query.lng!);
+      if (d < bestD) { bestD = d; best = b; }
+    });
+    return best;
+  }
+  return undefined;
+}
+
+// Apply a worker observation: fuses fill level, updates timestamp, persists, emits event.
+export function applyWorkerObservation(input: {
+  binCode?: string;
+  locationName?: string;
+  lat?: number;
+  lng?: number;
+  observedFillLevel: number;
+  remarks?: string;
+}): BinRecord | null {
+  const bins = getInitialBins();
+  const target = findBin(bins, input);
+  if (!target) return null;
+  const fused = fuseFillLevel(target.fillLevel, input.observedFillLevel);
+  const updated = bins.map(b => b.id === target.id ? {
+    ...b,
+    fillLevel: fused,
+    priority: getPriority(fused),
+    remarks: input.remarks ?? b.remarks,
+    dateObserved: new Date().toISOString().split('T')[0],
+    updatedAt: new Date().toISOString(),
+  } : b);
+  saveBins(updated);
+  return updated.find(b => b.id === target.id) || null;
+}
+
+// ===== HAVERSINE DISTANCE (km) =====
+export function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const toRad = (d: number) => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLng/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+// ===== DYNAMIC ROUTE OPTIMIZATION =====
+// Source and destination bins stay fixed. Intermediate bins are reordered
+// using a hybrid score: high fill level first, then nearest-neighbor.
+// Returns ordered list of bin codes (without source/destination duplicated).
+export function optimizeRouteBins(
+  bins: BinRecord[],
+  routeBinCodes: string[]
+): string[] {
+  if (routeBinCodes.length <= 2) return routeBinCodes;
+  const codeToBin: Record<string, BinRecord> = {};
+  bins.forEach(b => { codeToBin[b.binId.replace('HYD-', '')] = b; });
+
+  const source = routeBinCodes[0];
+  const destination = routeBinCodes[routeBinCodes.length - 1];
+  const middle = routeBinCodes.slice(1, -1).filter(c => codeToBin[c]);
+
+  if (middle.length === 0) return [source, destination];
+
+  // Greedy nearest-neighbor weighted by fill level.
+  // From current position, score each remaining bin: priorityScore - distanceKm.
+  const ordered: string[] = [];
+  let current = codeToBin[source];
+  const remaining = new Set(middle);
+
+  while (remaining.size > 0 && current) {
+    let bestCode: string | null = null;
+    let bestScore = -Infinity;
+    remaining.forEach(code => {
+      const b = codeToBin[code];
+      if (!b) return;
+      const dist = haversineKm(current!.latitude, current!.longitude, b.latitude, b.longitude);
+      // Higher fill = higher urgency. Weight: fillLevel/10 minus distance.
+      const score = (b.fillLevel / 10) - dist;
+      if (score > bestScore) { bestScore = score; bestCode = code; }
+    });
+    if (!bestCode) break;
+    ordered.push(bestCode);
+    remaining.delete(bestCode);
+    current = codeToBin[bestCode];
+  }
+  return [source, ...ordered, destination];
+}
+
+// Build dynamic version of routeDataset with re-optimized binFlow strings.
+export function getDynamicRoutes(bins?: BinRecord[]): RouteInfo[] {
+  const allBins = bins || getInitialBins();
+  return routeDataset.map(route => {
+    const optimized = optimizeRouteBins(allBins, route.bins);
+    return {
+      ...route,
+      bins: optimized,
+      binFlow: optimized.join('→'),
+    };
+  });
+}
+
+// ===== AUTO-FILL DRIFT =====
+// Simulates real-world bin filling. Call periodically to keep data "alive".
+export function driftFillLevels(): BinRecord[] {
+  const bins = getInitialBins();
+  const updated = bins.map(b => {
+    if (b.collected) return b;
+    // Random small increase 0-3% per tick, capped at 100.
+    const delta = Math.random() * 3;
+    const newFill = Math.min(100, b.fillLevel + delta);
+    return {
+      ...b,
+      fillLevel: Math.round(newFill),
+      priority: getPriority(newFill),
+      updatedAt: new Date().toISOString(),
+    };
+  });
+  saveBins(updated);
+  return updated;
+}
+
+// Reset bin store (admin utility).
+export function resetBinData(): BinRecord[] {
+  const fresh = generateRealBins();
+  saveBins(fresh);
+  return fresh;
 }
 
 // Collection history helpers
