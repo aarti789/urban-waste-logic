@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaf
 import L from 'leaflet';
 import 'leaflet-polylinedecorator';
 import { BinRecord } from '@/types';
-import { getDynamicRoutes } from '@/data/mockData';
+import { getDynamicRoutes, fetchRoadRoute } from '@/data/mockData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import 'leaflet/dist/leaflet.css';
@@ -31,15 +31,25 @@ const ROUTE_PALETTE = [
   '#06b6d4', '#a855f7', '#eab308', '#22c55e', '#dc2626',
 ];
 
-// Draws a single route with polyline + arrows + start/end markers, cleans up on unmount/change
+// Draws a route along ACTUAL Hyderabad roads (via OSRM) with arrows + start
+// marker. Falls back to straight line if the road-routing service is unreachable.
 const RouteLayer = ({ coords, routeId, truckNumber, zone, color }: { coords: [number, number][]; routeId: string; truckNumber: string; zone: string; color: string }) => {
   const map = useMap();
   const layerRef = useRef<L.LayerGroup | null>(null);
+  const [roadCoords, setRoadCoords] = useState<[number, number][]>(coords);
 
   useEffect(() => {
-    if (coords.length < 2) return;
+    let cancelled = false;
+    fetchRoadRoute(coords).then(road => {
+      if (!cancelled) setRoadCoords(road);
+    });
+    return () => { cancelled = true; };
+  }, [coords]);
 
-    const polyline = L.polyline(coords, {
+  useEffect(() => {
+    if (roadCoords.length < 2) return;
+
+    const polyline = L.polyline(roadCoords, {
       color,
       weight: 5,
       opacity: 0.85,
@@ -60,7 +70,6 @@ const RouteLayer = ({ coords, routeId, truckNumber, zone, color }: { coords: [nu
 
     polyline.bindTooltip(`${routeId} · ${truckNumber} · ${zone}`, { sticky: true });
 
-    // Start marker only (end is the shared dumpyard, drawn separately)
     const startMarker = L.circleMarker(L.latLng(coords[0][0], coords[0][1]), {
       radius: 8, fillColor: color, color: '#fff', weight: 2, fillOpacity: 1,
     }).bindPopup(`<b>Start</b><br/>${routeId} · ${zone}`);
@@ -74,7 +83,7 @@ const RouteLayer = ({ coords, routeId, truckNumber, zone, color }: { coords: [nu
         layerRef.current = null;
       }
     };
-  }, [map, coords, routeId, truckNumber, zone, color]);
+  }, [map, roadCoords, coords, routeId, truckNumber, zone, color]);
 
   return null;
 };
