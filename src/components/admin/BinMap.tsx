@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaf
 import L from 'leaflet';
 import 'leaflet-polylinedecorator';
 import { BinRecord } from '@/types';
-import { routeDataset } from '@/data/mockData';
+import { getDynamicRoutes } from '@/data/mockData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import 'leaflet/dist/leaflet.css';
@@ -122,9 +122,12 @@ const BinMap = ({ bins, onSelectBin, selectedRouteId }: Props) => {
     return map;
   }, [bins]);
 
+  // Dynamic routes: re-optimized whenever bin fill levels change.
+  const dynamicRoutes = useMemo(() => getDynamicRoutes(bins), [bins]);
+
   // Build per-route coordinate arrays. All routes terminate at the shared dumpyard.
   const routeLines = useMemo(() => {
-    return routeDataset.map((route, idx) => {
+    return dynamicRoutes.map((route, idx) => {
       const flowStr = route.binFlow.replace(/\s*\(.*?\)\s*/g, '');
       const codes = flowStr.split('→').map(s => s.trim()).filter(Boolean);
       const coords: [number, number][] = [];
