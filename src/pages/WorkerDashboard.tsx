@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { BinRecord, AreaType, WasteType, Zone, CollectionRecord } from '@/types';
-import { getInitialBins, saveBins, getCollectionHistory, saveCollectionHistory } from '@/data/mockData';
+import { getInitialBins, saveBins, getCollectionHistory, saveCollectionHistory, fuseFillLevel, BIN_UPDATE_EVENT } from '@/data/mockData';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';

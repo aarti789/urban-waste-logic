@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { BinRecord } from '@/types';
-import { getInitialBins, getCollectionHistory } from '@/data/mockData';
+import { getInitialBins, getCollectionHistory, BIN_UPDATE_EVENT, driftFillLevels } from '@/data/mockData';
 import OverviewCards from '@/components/admin/OverviewCards';
 import AlertsPanel from '@/components/admin/AlertsPanel';
 import BinMap from '@/components/admin/BinMap';
@@ -35,12 +35,20 @@ const AdminDashboard = () => {
     setBins(getInitialBins());
   }, []);
 
-  // Auto-refresh on tab switch and window focus (cross-tab updates)
+  // Auto-refresh: tab switch, window focus, custom bin-update events, and periodic drift.
   useEffect(() => {
     if (tab === 'overview') refreshData();
     const handleFocus = () => refreshData();
+    const handleBinsUpdated = () => refreshData();
     window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
+    window.addEventListener(BIN_UPDATE_EVENT, handleBinsUpdated);
+    // Simulate live fill drift every 30s — keeps mock data dynamic.
+    const driftTimer = setInterval(() => { driftFillLevels(); }, 30000);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener(BIN_UPDATE_EVENT, handleBinsUpdated);
+      clearInterval(driftTimer);
+    };
   }, [tab, refreshData]);
 
   const tabs: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
