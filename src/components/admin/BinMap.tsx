@@ -249,7 +249,7 @@ const BinMap = ({ bins, onSelectBin, selectedRouteId }: Props) => {
               Select Route {selectedRoute !== 'all' && <span className="text-foreground">· {selectedRoute}</span>}
             </span>
             <span className="text-[10px] text-muted-foreground">
-              {selectedRoute === 'all' ? `${routeDataset.length} routes shown` : '1 route shown'}
+              {selectedRoute === 'all' ? `${dynamicRoutes.length} routes shown` : '1 route shown'}
             </span>
           </div>
           <div className="flex flex-wrap gap-1.5 p-2 rounded-md border bg-muted/30 max-h-32 overflow-y-auto">
@@ -263,7 +263,7 @@ const BinMap = ({ bins, onSelectBin, selectedRouteId }: Props) => {
             >
               All Routes
             </button>
-            {routeDataset.map(route => (
+            {dynamicRoutes.map(route => (
               <button
                 key={route.routeId}
                 onClick={() => setSelectedRoute(route.routeId)}
