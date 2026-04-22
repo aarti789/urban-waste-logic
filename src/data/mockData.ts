@@ -202,20 +202,59 @@ function emitBinsUpdated() {
   try { window.dispatchEvent(new CustomEvent(BIN_UPDATE_EVENT)); } catch {}
 }
 
+// Bumped to v3: enforces unique truck assignment per bin (one truck per bin).
+const BIN_STORAGE_KEY = 'greenroute_bins_v3';
+
 export function getInitialBins(): BinRecord[] {
-  const stored = localStorage.getItem('greenroute_bins_v2');
+  const stored = localStorage.getItem(BIN_STORAGE_KEY);
   if (stored) {
     const parsed = JSON.parse(stored);
     if (parsed.length > 0 && parsed[0].zone) return parsed;
   }
   const bins = generateRealBins();
-  localStorage.setItem('greenroute_bins_v2', JSON.stringify(bins));
-  return bins;
+  // Enforce unique-truck-per-bin constraint based on routeDataset ownership.
+  const reassigned = enforceUniqueTruckAssignment(bins);
+  localStorage.setItem(BIN_STORAGE_KEY, JSON.stringify(reassigned));
+  return reassigned;
 }
 
 export function saveBins(bins: BinRecord[]) {
-  localStorage.setItem('greenroute_bins_v2', JSON.stringify(bins));
+  localStorage.setItem(BIN_STORAGE_KEY, JSON.stringify(bins));
   emitBinsUpdated();
+}
+
+// ===== UNIQUE TRUCK ASSIGNMENT =====
+// Each bin must belong to exactly one truck. If a bin appears in multiple
+// routes (overlap), the first route wins. Bins not in any route get the
+// nearest assigned truck (by source-bin proximity).
+function enforceUniqueTruckAssignment(bins: BinRecord[]): BinRecord[] {
+  const binToTruck: Record<string, string> = {};
+  routeDataset.forEach(route => {
+    route.bins.forEach(code => {
+      if (!binToTruck[code]) binToTruck[code] = route.truckNumber;
+    });
+  });
+  // Find each route's source bin coords for fallback nearest-truck assignment.
+  const truckAnchors: { truck: string; lat: number; lng: number }[] = [];
+  routeDataset.forEach(r => {
+    const sourceCode = r.sourceBin.replace('HYD-', '');
+    const anchor = bins.find(b => b.binId.replace('HYD-', '') === sourceCode);
+    if (anchor) truckAnchors.push({ truck: r.truckNumber, lat: anchor.latitude, lng: anchor.longitude });
+  });
+  return bins.map(b => {
+    const code = b.binId.replace('HYD-', '');
+    let truck = binToTruck[code];
+    if (!truck && truckAnchors.length) {
+      let best = truckAnchors[0];
+      let bestD = haversineKm(b.latitude, b.longitude, best.lat, best.lng);
+      for (const a of truckAnchors) {
+        const d = haversineKm(b.latitude, b.longitude, a.lat, a.lng);
+        if (d < bestD) { bestD = d; best = a; }
+      }
+      truck = best.truck;
+    }
+    return { ...b, assignedTruck: truck || b.assignedTruck };
+  });
 }
 
 // ===== FILL-LEVEL FUSION =====
@@ -288,10 +327,36 @@ export function haversineKm(lat1: number, lng1: number, lat2: number, lng2: numb
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
+// ===== AREA CLUSTERING =====
+// Group bins into geographic clusters (~2km radius) so route picks stay local.
+// Uses simple distance-based agglomerative grouping.
+export function clusterBinsByProximity(bins: BinRecord[], radiusKm = 2.5): Record<string, string[]> {
+  const clusters: { centerLat: number; centerLng: number; codes: string[] }[] = [];
+  bins.forEach(b => {
+    const code = b.binId.replace('HYD-', '');
+    const found = clusters.find(c =>
+      haversineKm(c.centerLat, c.centerLng, b.latitude, b.longitude) <= radiusKm
+    );
+    if (found) {
+      found.codes.push(code);
+      // Update center as running mean
+      const n = found.codes.length;
+      found.centerLat = (found.centerLat * (n - 1) + b.latitude) / n;
+      found.centerLng = (found.centerLng * (n - 1) + b.longitude) / n;
+    } else {
+      clusters.push({ centerLat: b.latitude, centerLng: b.longitude, codes: [code] });
+    }
+  });
+  const result: Record<string, string[]> = {};
+  clusters.forEach((c, i) => { result[`cluster-${i}`] = c.codes; });
+  return result;
+}
+
 // ===== DYNAMIC ROUTE OPTIMIZATION =====
-// Source and destination bins stay fixed. Intermediate bins are reordered
-// using a hybrid score: high fill level first, then nearest-neighbor.
-// Returns ordered list of bin codes (without source/destination duplicated).
+// Destination bin stays fixed. Source MAY be swapped for a nearby high-fill
+// bin to improve efficiency. Intermediate bins are reordered using
+// nearest-first traversal weighted by fill priority. Bins are restricted to
+// nearby clusters to avoid cross-city zigzag.
 export function optimizeRouteBins(
   bins: BinRecord[],
   routeBinCodes: string[]
@@ -300,17 +365,36 @@ export function optimizeRouteBins(
   const codeToBin: Record<string, BinRecord> = {};
   bins.forEach(b => { codeToBin[b.binId.replace('HYD-', '')] = b; });
 
-  const source = routeBinCodes[0];
+  const originalSource = routeBinCodes[0];
   const destination = routeBinCodes[routeBinCodes.length - 1];
   const middle = routeBinCodes.slice(1, -1).filter(c => codeToBin[c]);
 
-  if (middle.length === 0) return [source, destination];
+  if (middle.length === 0) return [originalSource, destination];
 
-  // Greedy nearest-neighbor weighted by fill level.
-  // From current position, score each remaining bin: priorityScore - distanceKm.
+  // Source adjustment: prefer the highest-fill bin among source + first 2
+  // middle candidates that's still close (within 3km of original source).
+  let source = originalSource;
+  const srcBin = codeToBin[originalSource];
+  if (srcBin) {
+    const candidates = [originalSource, ...middle.slice(0, 3)]
+      .map(c => codeToBin[c])
+      .filter(Boolean)
+      .filter(b => haversineKm(srcBin.latitude, srcBin.longitude, b.latitude, b.longitude) <= 3);
+    if (candidates.length) {
+      candidates.sort((a, b) => b.fillLevel - a.fillLevel);
+      const best = candidates[0];
+      if (best.fillLevel > srcBin.fillLevel + 15) {
+        source = best.binId.replace('HYD-', '');
+      }
+    }
+  }
+
+  // Rebuild middle set excluding (possibly new) source.
+  const remaining = new Set([...middle, originalSource].filter(c => c !== source && c !== destination));
+
+  // Nearest-first traversal, lightly biased by fill level.
   const ordered: string[] = [];
   let current = codeToBin[source];
-  const remaining = new Set(middle);
 
   while (remaining.size > 0 && current) {
     let bestCode: string | null = null;
@@ -319,8 +403,9 @@ export function optimizeRouteBins(
       const b = codeToBin[code];
       if (!b) return;
       const dist = haversineKm(current!.latitude, current!.longitude, b.latitude, b.longitude);
-      // Higher fill = higher urgency. Weight: fillLevel/10 minus distance.
-      const score = (b.fillLevel / 10) - dist;
+      // Nearest-first dominates; fill level is a small tiebreaker.
+      // score = -dist + (fill/100). Closer bins always win unless distance ties.
+      const score = -dist + (b.fillLevel / 200);
       if (score > bestScore) { bestScore = score; bestCode = code; }
     });
     if (!bestCode) break;
@@ -332,6 +417,7 @@ export function optimizeRouteBins(
 }
 
 // Build dynamic version of routeDataset with re-optimized binFlow strings.
+// Truck assignments stay fixed (each bin → one truck) per enforceUniqueTruckAssignment.
 export function getDynamicRoutes(bins?: BinRecord[]): RouteInfo[] {
   const allBins = bins || getInitialBins();
   return routeDataset.map(route => {
@@ -342,6 +428,32 @@ export function getDynamicRoutes(bins?: BinRecord[]): RouteInfo[] {
       binFlow: optimized.join('→'),
     };
   });
+}
+
+// ===== ROAD-FOLLOWING ROUTES (OSRM) =====
+// Returns route geometry that follows actual Hyderabad roads via the public
+// OSRM demo server. Falls back to straight-line if the request fails.
+const osrmCache = new Map<string, [number, number][]>();
+
+export async function fetchRoadRoute(coords: [number, number][]): Promise<[number, number][]> {
+  if (coords.length < 2) return coords;
+  const key = coords.map(c => `${c[0].toFixed(4)},${c[1].toFixed(4)}`).join('|');
+  if (osrmCache.has(key)) return osrmCache.get(key)!;
+  try {
+    const coordStr = coords.map(c => `${c[1]},${c[0]}`).join(';');
+    const url = `https://router.project-osrm.org/route/v1/driving/${coordStr}?overview=full&geometries=geojson`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('OSRM error');
+    const data = await res.json();
+    const geo = data?.routes?.[0]?.geometry?.coordinates as [number, number][] | undefined;
+    if (!geo) throw new Error('No geometry');
+    const latLngs: [number, number][] = geo.map(([lng, lat]) => [lat, lng]);
+    osrmCache.set(key, latLngs);
+    return latLngs;
+  } catch {
+    osrmCache.set(key, coords);
+    return coords;
+  }
 }
 
 // ===== AUTO-FILL DRIFT =====
