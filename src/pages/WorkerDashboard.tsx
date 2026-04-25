@@ -1,14 +1,16 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { BinRecord, AreaType, WasteType, Zone, CollectionRecord } from '@/types';
-import { getInitialBins, saveBins, getCollectionHistory, saveCollectionHistory, fuseFillLevel, BIN_UPDATE_EVENT } from '@/data/mockData';
+import { fuseFillLevel } from '@/data/mockData';
+import { useBinsLive } from '@/hooks/useBinsLive';
+import { upsertBin, updateBinFill, addCollection } from '@/lib/binsApi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Recycle, LogOut, Plus, Pencil, Check, X, CheckCircle2, History, ClipboardList } from 'lucide-react';
+import { Recycle, LogOut, Plus, Pencil, Check, X, CheckCircle2, History, ClipboardList, Wifi } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 type Tab = 'bins' | 'history';
@@ -16,8 +18,7 @@ type Tab = 'bins' | 'history';
 const WorkerDashboard = () => {
   const { username, logout } = useAuth();
   const { toast } = useToast();
-  const [bins, setBins] = useState<BinRecord[]>(getInitialBins);
-  const [history, setHistory] = useState<CollectionRecord[]>(getCollectionHistory);
+  const { bins, collections: history, loading } = useBinsLive();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('bins');
@@ -32,14 +33,14 @@ const WorkerDashboard = () => {
 
   const getPriority = (fl: number): 1 | 2 | 3 => fl >= 80 ? 3 : fl >= 50 ? 2 : 1;
 
-  const collectBin = (bin: BinRecord) => {
+  const collectBin = async (bin: BinRecord) => {
     const now = new Date().toISOString();
-    const updatedBins = bins.map(b =>
-      b.id === bin.id ? { ...b, collected: true, collectedAt: now, fillLevel: 0, priority: 1 as const, updatedAt: now } : b
-    );
-    setBins(updatedBins);
-    saveBins(updatedBins);
-
+    await updateBinFill(bin.id, {
+      collected: true,
+      collectedAt: now,
+      fillLevel: 0,
+      priority: 1,
+    });
     const record: CollectionRecord = {
       binId: bin.id,
       binName: bin.binId,
@@ -50,28 +51,11 @@ const WorkerDashboard = () => {
       collectedAt: now,
       collectedBy: username || 'worker',
     };
-    const updatedHistory = [record, ...history];
-    setHistory(updatedHistory);
-    saveCollectionHistory(updatedHistory);
-
-    toast({ title: 'Bin collected', description: `${bin.binId} marked as collected` });
+    await addCollection(record);
+    toast({ title: 'Bin collected', description: `${bin.binId} synced to backend` });
   };
 
-  // Live sync: react to bin updates from any source (admin drift, other tabs).
-  React.useEffect(() => {
-    const handler = () => {
-      setBins(getInitialBins());
-      setHistory(getCollectionHistory());
-    };
-    window.addEventListener(BIN_UPDATE_EVENT, handler);
-    window.addEventListener('focus', handler);
-    return () => {
-      window.removeEventListener(BIN_UPDATE_EVENT, handler);
-      window.removeEventListener('focus', handler);
-    };
-  }, []);
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const incomingFill = parseInt(form.fillLevel);
 
@@ -82,6 +66,7 @@ const WorkerDashboard = () => {
       if (existing) finalFill = fuseFillLevel(existing.fillLevel, incomingFill);
     }
 
+    const existingBin = editingId ? bins.find(b => b.id === editingId) : undefined;
     const newRecord: BinRecord = {
       id: editingId || `rec-${Date.now()}`,
       binId: form.binId,
@@ -99,26 +84,19 @@ const WorkerDashboard = () => {
       remarks: form.remarks || undefined,
       priority: getPriority(finalFill),
       collected: false,
-      createdAt: editingId ? bins.find(b => b.id === editingId)?.createdAt || new Date().toISOString() : new Date().toISOString(),
+      createdAt: existingBin?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
-    let updated: BinRecord[];
-    if (editingId) {
-      updated = bins.map(b => b.id === editingId ? newRecord : b);
-    } else {
-      updated = [...bins, newRecord];
-    }
-    setBins(updated);
-    saveBins(updated);
+    await upsertBin(newRecord);
     setForm(emptyForm);
     setEditingId(null);
     setShowForm(false);
     toast({
       title: editingId ? 'Record updated' : 'Bin added',
       description: editingId
-        ? `${form.binId} fused fill level: ${finalFill}% (worker reported ${incomingFill}%)`
-        : `${form.binId} saved successfully`,
+        ? `${form.binId} fused fill: ${finalFill}% (worker reported ${incomingFill}%) — synced`
+        : `${form.binId} synced to backend`,
     });
   };
 
@@ -159,6 +137,9 @@ const WorkerDashboard = () => {
             <span className="font-semibold text-sm">GreenRoute</span>
           </div>
           <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1 text-xs text-success" title="Live backend sync">
+              <Wifi className="w-3 h-3" />
+            </span>
             <span className="text-xs text-muted-foreground">{username}</span>
             <Button variant="ghost" size="sm" onClick={logout}><LogOut className="w-4 h-4" /></Button>
           </div>
@@ -166,6 +147,9 @@ const WorkerDashboard = () => {
       </header>
 
       <main className="max-w-2xl mx-auto p-4 space-y-4">
+        {loading && bins.length === 0 && (
+          <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Loading live bin data…</CardContent></Card>
+        )}
         {/* Tab switcher */}
         {!showForm && (
           <div className="flex gap-1 p-1 bg-muted rounded-lg">

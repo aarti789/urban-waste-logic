@@ -164,6 +164,10 @@ function seededRandom() {
   return (seed - 1) / 2147483646;
 }
 
+export function generateInitialBinsForSeed(): BinRecord[] {
+  return enforceUniqueTruckAssignment(generateRealBins());
+}
+
 function generateRealBins(): BinRecord[] {
   seed = 42; // reset seed
   const trucks = routeDataset.map(r => r.truckNumber);
