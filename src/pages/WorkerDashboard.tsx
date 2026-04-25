@@ -147,6 +147,9 @@ const WorkerDashboard = () => {
       </header>
 
       <main className="max-w-2xl mx-auto p-4 space-y-4">
+        {loading && bins.length === 0 && (
+          <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Loading live bin data…</CardContent></Card>
+        )}
         {/* Tab switcher */}
         {!showForm && (
           <div className="flex gap-1 p-1 bg-muted rounded-lg">
