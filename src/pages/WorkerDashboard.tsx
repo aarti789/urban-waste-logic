@@ -137,6 +137,9 @@ const WorkerDashboard = () => {
             <span className="font-semibold text-sm">GreenRoute</span>
           </div>
           <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1 text-xs text-success" title="Live backend sync">
+              <Wifi className="w-3 h-3" />
+            </span>
             <span className="text-xs text-muted-foreground">{username}</span>
             <Button variant="ghost" size="sm" onClick={logout}><LogOut className="w-4 h-4" /></Button>
           </div>
