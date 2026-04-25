@@ -102,12 +102,15 @@ export async function updateBinFill(
   binDbId: string,
   patch: Partial<Pick<BinRecord, 'fillLevel' | 'priority' | 'remarks' | 'collected' | 'collectedAt' | 'dateObserved'>>
 ): Promise<void> {
-  const row: Record<string, unknown> = {};
+  const row: {
+    fill_level?: number; priority?: number; remarks?: string | null;
+    collected?: boolean; collected_at?: string | null; date_observed?: string;
+  } = {};
   if (patch.fillLevel !== undefined) row.fill_level = patch.fillLevel;
   if (patch.priority !== undefined) row.priority = patch.priority;
-  if (patch.remarks !== undefined) row.remarks = patch.remarks;
+  if (patch.remarks !== undefined) row.remarks = patch.remarks ?? null;
   if (patch.collected !== undefined) row.collected = patch.collected;
-  if (patch.collectedAt !== undefined) row.collected_at = patch.collectedAt;
+  if (patch.collectedAt !== undefined) row.collected_at = patch.collectedAt ?? null;
   if (patch.dateObserved !== undefined) row.date_observed = patch.dateObserved;
   const { error } = await supabase.from('bins').update(row).eq('id', binDbId);
   if (error) console.error('[binsApi] updateBinFill error', error);
