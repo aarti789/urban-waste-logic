@@ -14,7 +14,111 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      bins: {
+        Row: {
+          area_type: string
+          assigned_truck: string
+          bin_code: string
+          bin_id: string
+          capacity: number
+          collected: boolean
+          collected_at: string | null
+          created_at: string
+          date_observed: string
+          fill_level: number
+          id: string
+          latitude: number
+          location_name: string
+          longitude: number
+          priority: number
+          remarks: string | null
+          sub_location: string
+          updated_at: string
+          waste_type: string
+          zone: string
+        }
+        Insert: {
+          area_type: string
+          assigned_truck: string
+          bin_code: string
+          bin_id: string
+          capacity: number
+          collected?: boolean
+          collected_at?: string | null
+          created_at?: string
+          date_observed?: string
+          fill_level?: number
+          id?: string
+          latitude: number
+          location_name: string
+          longitude: number
+          priority?: number
+          remarks?: string | null
+          sub_location: string
+          updated_at?: string
+          waste_type: string
+          zone: string
+        }
+        Update: {
+          area_type?: string
+          assigned_truck?: string
+          bin_code?: string
+          bin_id?: string
+          capacity?: number
+          collected?: boolean
+          collected_at?: string | null
+          created_at?: string
+          date_observed?: string
+          fill_level?: number
+          id?: string
+          latitude?: number
+          location_name?: string
+          longitude?: number
+          priority?: number
+          remarks?: string | null
+          sub_location?: string
+          updated_at?: string
+          waste_type?: string
+          zone?: string
+        }
+        Relationships: []
+      }
+      collections: {
+        Row: {
+          bin_id: string
+          bin_name: string
+          collected_at: string
+          collected_by: string
+          fill_level: number
+          id: string
+          location_name: string
+          priority: number
+          zone: string
+        }
+        Insert: {
+          bin_id: string
+          bin_name: string
+          collected_at?: string
+          collected_by: string
+          fill_level: number
+          id?: string
+          location_name: string
+          priority: number
+          zone: string
+        }
+        Update: {
+          bin_id?: string
+          bin_name?: string
+          collected_at?: string
+          collected_by?: string
+          fill_level?: number
+          id?: string
+          location_name?: string
+          priority?: number
+          zone?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
